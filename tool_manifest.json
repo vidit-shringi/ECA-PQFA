@@ -1,0 +1,67 @@
+{
+  "name": "ECA-PQFA",
+  "version": "3.1.0",
+  "title": "Evidence-Carrying AI-Assisted Cryptanalysis and Post-Quantum Forensic Assurance",
+  "type": "complete-research-tool",
+  "entrypoints": {
+    "web": "eca-pqfa serve",
+    "cli": "eca-pqfa",
+    "demo": "eca-pqfa demo",
+    "tests": "eca-pqfa test",
+    "api_docs": "http://127.0.0.1:8000/docs"
+  },
+  "capabilities": [
+    "evidence_hashing",
+    "claim_validation",
+    "scope_inflation_detection",
+    "claim_form_verification",
+    "assurance_l0_l3",
+    "independence_checking",
+    "append_only_provenance",
+    "merkle_inclusion_proofs",
+    "merkle_consistency_proofs",
+    "signed_tree_heads",
+    "ed25519_signing",
+    "optional_ml_dsa_65_signing",
+    "cryptographic_inventory",
+    "cyclonedx_cbom_export",
+    "digital_twin_relationships",
+    "hndl_risk_assessment",
+    "migration_evidence",
+    "experiment_metrics",
+    "google_sheets_bridge",
+    "browser_console"
+  ],
+  "research_semantics": {
+    "claim_tuple": "C=(H,W,E,V,P)",
+    "claim_forms": ["EX", "ST", "CX", "PD", "IM", "PR", "NG", "ID"],
+    "scopes": ["A", "B", "C", "D"],
+    "assurance_levels": ["L0", "L1", "L2", "L3"],
+    "ai_is_grading_authority": false,
+    "negative_result_is_security_proof": false,
+    "identification_is_compromise": false
+  },
+  "data": {
+    "default_dataset": "data/synthetic",
+    "evidence_storage": "controlled filesystem or external evidence store",
+    "metadata_persistence": "SQLite with optional Google Sheets synchronization",
+    "confidentiality_boundary": "Do not publish confidential evidence or secrets"
+  },
+  "security": {
+    "api_key_auth": true,
+    "restricted_paths": true,
+    "security_headers": true,
+    "cors_configuration": true,
+    "provenance_update_delete_blocked": true,
+    "external_timestamp_authority": false,
+    "hsm_kms": false,
+    "oauth_rbac": false
+  },
+  "authoritative_docs": [
+    "AGENTS.md",
+    "docs/TRP_CONTEXT.md",
+    "docs/TOOL_SPEC.md",
+    "docs/RESEARCH_INTEGRITY.md",
+    "docs/SECURITY_MODEL.md"
+  ]
+}

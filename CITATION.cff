@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+title: "ECA-PQFA: Evidence-Carrying AI-Assisted Cryptanalysis and Post-Quantum Forensic Assurance"
+message: "Please cite this repository when using the ECA-PQFA software or research materials."
+type: software
+version: "3.1.0"
+authors:
+  - family-names: Shringi
+    given-names: Vidit
+    orcid: "https://orcid.org/0009-0003-6447-0538"
+repository-code: "https://github.com/YOUR_USERNAME/ECA-PQFA"
+abstract: "Complete research tool and reference implementation for evidence-carrying AI-assisted cryptanalysis, cryptographic provenance, post-quantum migration assurance, HNDL risk assessment, and reproducible verification."
+keywords:
+  - cryptanalysis
+  - post-quantum cryptography
+  - digital forensics
+  - provenance
+  - HNDL
+  - CBOM
+  - AI-assisted cryptanalysis
+license: MIT
