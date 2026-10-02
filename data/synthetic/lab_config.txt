@@ -1,0 +1,6 @@
+ECA-PQFA SYNTHETIC LAB CONFIG
+algorithm=ML-KEM-768
+key_exchange=X25519
+signature=ML-DSA-65
+hash=SHA3-256
+purpose=controlled controlled tool validation

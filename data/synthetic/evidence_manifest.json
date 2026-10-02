@@ -1,0 +1,6 @@
+{
+  "dataset": "ECA-PQFA-SYNTH-001",
+  "status": "SYNTHETIC",
+  "purpose": "Controlled university research-tool validation",
+  "artifacts": ["lab_config.txt", "test_vector.txt", "tls_config.txt", "statistics.csv"]
+}

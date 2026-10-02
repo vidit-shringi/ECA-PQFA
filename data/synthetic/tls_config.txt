@@ -1,0 +1,5 @@
+# SYNTHETIC TLS CONFIGURATION - NOT A REAL SYSTEM
+protocol = TLSv1.3
+groups = X25519MLKEM768:X25519
+certificate_signature = ML-DSA-65
+legacy_fallback = disabled

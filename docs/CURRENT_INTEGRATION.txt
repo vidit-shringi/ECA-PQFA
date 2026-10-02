@@ -1,0 +1,3 @@
+Spreadsheet ID: YOUR_ECA_PQFA_SPREADSHEET_ID
+Apps Script URL: YOUR_ECA_PQFA_APPS_SCRIPT_WEBAPP_URL
+Set these locally through environment variables or Apps Script Project Settings. Public repository files intentionally contain placeholders.
