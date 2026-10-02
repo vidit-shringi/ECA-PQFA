@@ -51,3 +51,14 @@ def test_scope_inflation_is_rejected():
         body = response.json()
         assert body["valid"] is False
         assert body["scope_status"] == "VERIFIED_SCOPE_NARROWER"
+
+
+def test_config_does_not_expose_integration_identifier():
+    with TestClient(app) as client:
+        response = client.get("/api/config")
+        assert response.status_code == 200
+        body = response.json()
+        assert "spreadsheet_id" not in body
+        assert "evidence_root" not in body
+        assert "spreadsheet_configured" in body
+        assert "evidence_storage_configured" in body
