@@ -9,7 +9,7 @@ cd ECA-PQFA
 py -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -e ".[dev]"
-python run.py
+eca-pqfa health\neca-pqfa serve
 ```
 
 Open:
@@ -27,12 +27,12 @@ cd ECA-PQFA
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
-python run.py
+eca-pqfa serve
 ```
 
 ## B. Update the existing Google Apps Script deployment
 
-The ZIP includes a complete replacement Apps Script project under `apps-script/`.
+The repository includes a complete replacement Apps Script project under `apps-script/`.
 
 In the existing ECA-PQFA Sheet:
 

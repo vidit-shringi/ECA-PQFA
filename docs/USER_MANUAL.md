@@ -1,6 +1,6 @@
-# User Manual
+# ECA-PQFA User Manual\n\nVersion 3.2.0
 
-## Dashboard
+## Browser research console\nStart the service with `eca-pqfa serve` and open `http://127.0.0.1:8000`. The console exposes health, dashboard counts, claim validation, inventory/CBOM and provenance audit operations.\n\n## Dashboard
 Use the dashboard to confirm the API is running and inspect high-level counts.
 
 ## Cases

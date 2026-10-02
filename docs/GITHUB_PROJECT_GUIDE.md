@@ -2,7 +2,7 @@
 
 ## Repository name
 
-`ECA-PQFA`
+`vidit-shringi/ECA-PQFA`
 
 ## Suggested description
 
@@ -16,15 +16,15 @@ From the extracted repository root:
 git init
 git branch -M main
 git add .
-git commit -m "Initial release: ECA-PQFA 3.1.0"
-git remote add origin https://github.com/YOUR_USERNAME/ECA-PQFA.git
+git commit -m "Release: ECA-PQFA 3.2.0"
+git remote add origin https://github.com/vidit-shringi/ECA-PQFA.git
 git push -u origin main
 ```
 
 ## First release
 
 ```bash
-git tag -a v3.1.0 -m "ECA-PQFA complete research tool v3.1.0"
+git tag -a v3.2.0 -m "ECA-PQFA complete research tool v3.1.0"
 git push origin v3.1.0
 ```
 
