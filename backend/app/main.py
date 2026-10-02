@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Dict
 
@@ -49,6 +50,13 @@ from backend.app.services.verification import run_verification
 ROOT = Path(__file__).resolve().parents[2]
 FRONTEND = ROOT / "frontend"
 
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    init_db()
+    EVIDENCE_ROOT.mkdir(parents=True, exist_ok=True)
+    yield
+
+
 app = FastAPI(
     title=settings.app_name,
     version=settings.version,
@@ -56,6 +64,7 @@ app = FastAPI(
         "Evidence-Carrying AI-Assisted Cryptanalysis and Post-Quantum "
         "Forensic Assurance research tool and reference implementation."
     ),
+    lifespan=lifespan,
 )
 app.add_middleware(
     CORSMiddleware,
@@ -64,12 +73,6 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PATCH", "DELETE"],
     allow_headers=["*"],
 )
-
-
-@app.on_event("startup")
-def startup() -> None:
-    init_db()
-    EVIDENCE_ROOT.mkdir(parents=True, exist_ok=True)
 
 
 @app.middleware("http")
@@ -112,7 +115,7 @@ def config():
         "spreadsheet_configured": bool(settings.spreadsheet_id),
         "apps_script_url_configured": bool(settings.apps_script_url),
         "sheets": list(SHEETS.keys()),
-        "evidence_root": str(EVIDENCE_ROOT),
+        "evidence_storage_configured": EVIDENCE_ROOT.exists(),
         "security_mode": "API_KEY" if settings.require_api_key else "LOCAL_DEMO",
     }
 

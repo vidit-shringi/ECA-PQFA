@@ -53,7 +53,9 @@ def validate_claim(c: Dict[str, Any]) -> Dict[str, Any]:
 
     ss = scope_status(claimed, verified)
     if ss == "SCOPE_INFLATION":
-        issues.append("Scope inflation detected: the verified scope is broader than the claimed scope.")
+        issues.append("Scope mismatch detected: the verified scope is broader than the claimed scope.")
+    elif ss == "VERIFIED_SCOPE_NARROWER":
+        issues.append("Scope inflation detected: the claimed scope is broader than the verified scope.")
 
     return {"valid": not issues, "issues": issues, "scope_status": ss}
 
