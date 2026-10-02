@@ -6,7 +6,7 @@ Start the service:
 eca-pqfa serve
 ```
 
-Open Swagger UI:
+Open the browser research console:\n\n`http://127.0.0.1:8000`\n\nOpen Swagger UI:
 
 `http://127.0.0.1:8000/docs`
 
@@ -59,4 +59,4 @@ curl -X POST http://127.0.0.1:8000/api/inventory/cbom \
   -d '{"path":"data/synthetic","recursive":true}'
 ```
 
-Mutation routes require `X-ECA-API-Key` when `ECA_PQFA_REQUIRE_API_KEY=true`.
+Mutation routes require `X-ECA-API-Key` when `ECA_PQFA_REQUIRE_API_KEY=true`. The public configuration endpoint reports integration status without exposing configured identifiers.

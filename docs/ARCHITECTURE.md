@@ -1,9 +1,9 @@
-# ECA-PQFA Architecture v3
+# ECA-PQFA Architecture v3.2
 
 ```text
                  ┌─────────────────────────────┐
                  │      Research Console       │
-                 │ HTML/CSS/JS                 │
+                 │ HTML/CSS/JavaScript                 │
                  └──────────────┬──────────────┘
                                 │ REST
                  ┌──────────────▼──────────────┐

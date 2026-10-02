@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+VERSION = "3.2.0"
 
 
 def _hash_file(path: str) -> dict[str, str | int]:
@@ -94,7 +95,7 @@ def cmd_health(args: argparse.Namespace) -> int:
         json.dumps(
             {
                 "tool": "ECA-PQFA",
-                "version": "3.1.0",
+                "version": VERSION,
                 "root": str(ROOT),
                 "python": sys.version.split()[0],
                 "endpoint": f"http://{args.host}:{args.port}",
@@ -113,7 +114,7 @@ def build_parser() -> argparse.ArgumentParser:
             "post-quantum forensic assurance research tool."
         ),
     )
-    parser.add_argument("--version", action="version", version="ECA-PQFA 3.1.0")
+    parser.add_argument("--version", action="version", version=f"ECA-PQFA {VERSION}")
     sub = parser.add_subparsers(dest="command", required=True)
 
     p = sub.add_parser("serve", help="Run the FastAPI research tool")

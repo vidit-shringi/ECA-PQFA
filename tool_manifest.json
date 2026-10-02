@@ -1,6 +1,6 @@
 {
   "name": "ECA-PQFA",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "title": "Evidence-Carrying AI-Assisted Cryptanalysis and Post-Quantum Forensic Assurance",
   "type": "complete-research-tool",
   "entrypoints": {
@@ -34,9 +34,9 @@
   ],
   "research_semantics": {
     "claim_tuple": "C=(H,W,E,V,P)",
-    "claim_forms": ["EX", "ST", "CX", "PD", "IM", "PR", "NG", "ID"],
-    "scopes": ["A", "B", "C", "D"],
-    "assurance_levels": ["L0", "L1", "L2", "L3"],
+    "claim_forms": ["EX","ST","CX","PD","IM","PR","NG","ID"],
+    "scopes": ["A","B","C","D"],
+    "assurance_levels": ["L0","L1","L2","L3"],
     "ai_is_grading_authority": false,
     "negative_result_is_security_proof": false,
     "identification_is_compromise": false

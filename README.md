@@ -2,7 +2,9 @@
 
 ## Evidence-Carrying AI-Assisted Cryptanalysis and Post-Quantum Forensic Assurance
 
-**Version 3.1.0 — Complete Research Tool / Reference Implementation**
+[![CI](https://github.com/vidit-shringi/ECA-PQFA/actions/workflows/ci.yml/badge.svg)](https://github.com/vidit-shringi/ECA-PQFA/actions/workflows/ci.yml)
+
+**Version 3.2.0 — Complete Research Tool / Reference Implementation**
 
 ECA-PQFA is a complete, runnable research tool for turning controlled cryptographic evidence into scoped claims, deterministic verification records, assurance states, auditable provenance, cryptographic inventories, CBOM outputs, digital-twin relationships, HNDL risk assessments, and post-quantum migration evidence.
 
@@ -241,7 +243,7 @@ ECA-PQFA/
 ├── data/
 │   ├── demo/
 │   └── synthetic/
-├── docs/
+├── frontend/\n│   ├── index.html\n│   ├── app.js\n│   └── styles.css\n├── docs/
 │   ├── TRP_CONTEXT.md
 │   ├── TOOL_SPEC.md
 │   ├── USING_AS_A_RESEARCH_TOOL.md

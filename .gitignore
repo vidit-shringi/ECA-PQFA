@@ -4,6 +4,13 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.coverage
+htmlcov/
+
+# Packaging
+build/
+dist/
+*.egg-info/
 
 # Virtual environments
 .venv/
@@ -46,5 +53,3 @@ Thumbs.db
 
 # Node
 node_modules/
-dist/
-build/
