@@ -1,0 +1,21 @@
+<!doctype html><html><head><base target="_top"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ECA-PQFA</title>
+<style>
+body{margin:0;background:#07090d;color:#f4f6fb;font-family:Inter,system-ui,sans-serif}.wrap{max-width:1200px;margin:auto;padding:24px}.top{display:flex;justify-content:space-between;align-items:center}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.card{border:1px solid #222b36;background:#0f141b;border-radius:16px;padding:16px}.metric{font-size:28px;font-weight:800}.muted{color:#9aa6b2;font-size:12px}.toolbar{display:flex;gap:8px;flex-wrap:wrap}.btn{padding:10px 12px;border-radius:10px;border:1px solid #26313d;background:#111821;color:#fff;cursor:pointer}.btn.primary{border-color:#2b99ba}.table{overflow:auto;margin-top:14px}table{border-collapse:collapse;width:100%;min-width:900px}th,td{padding:8px;border-bottom:1px solid #222b36;font-size:11px;text-align:left;vertical-align:top}th{color:#9aa6b2;text-align:left}.status{color:#63e6a4}.code{background:#090c10;border:1px solid #222b36;border-radius:10px;padding:12px;white-space:pre-wrap;word-break:break-word}
+@media(max-width:800px){.grid{grid-template-columns:repeat(2,1fr)}}
+</style></head>
+<body><div class="wrap">
+<div class="top"><div><h1>ECA-PQFA</h1><div class="muted">Evidence-Carrying AI-Assisted Cryptanalysis and Post-Quantum Forensic Assurance</div></div><div id="status" class="status">Connecting</div></div>
+<div style="height:14px"></div><div id="metrics" class="grid"></div><div style="height:14px"></div>
+<div class="card"><div class="toolbar"><button class="btn primary" onclick="demo()">Create synthetic demo case</button><button class="btn" onclick="setup()">Initialize workbook</button><button class="btn" onclick="load()">Refresh</button></div><div class="muted" style="margin-top:10px">This UI uses the already-authorized spreadsheet account. It does not expose binary evidence or real-world offensive functionality.</div></div>
+<div style="height:14px"></div><div class="card"><h2>Cases</h2><div class="table" id="cases">Loading…</div></div>
+<div style="height:14px"></div><div class="card"><h2>Claims</h2><div class="table" id="claims">Loading…</div></div>
+<div style="height:14px"></div><div class="card"><h2>System</h2><pre id="system" class="code"></pre></div>
+</div>
+<script>
+function run(name,args,ok){google.script.run.withSuccessHandler(ok).withFailureHandler(e=>{document.getElementById('status').textContent='Error';alert(e.message||e)} )[name](...(args||[]))}
+function render(id,rows){const el=document.getElementById(id);if(!rows.length){el.textContent='No records';return}const hs=Object.keys(rows[0]);el.innerHTML='<table><thead><tr>'+hs.map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+hs.map(h=>'<td>'+String(r[h]??'')+'</td>').join('')+'</tr>').join('')+'</tbody></table>'}
+function load(){run('uiDashboard',[],d=>{document.getElementById('status').textContent='Connected';const items=[['Cases',d.Total_Cases],['Evidence',d.Total_Evidence_Objects],['Claims',d.Total_Claims],['L0',d.L0_Claims],['L1',d.L1_Claims],['L2',d.L2_Claims],['L3',d.L3_Claims],['Failed audits',d.Failed_Audits]];document.getElementById('metrics').innerHTML=items.map(x=>'<div class="card"><div class="muted">'+x[0]+'</div><div class="metric">'+x[1]+'</div></div>').join('')});run('uiList',['01_CASES'],r=>render('cases',r));run('uiList',['03_CLAIMS'],r=>render('claims',r));run('uiHealth',[],d=>document.getElementById('system').textContent=JSON.stringify(d,null,2))}
+function demo(){run('uiCreateDemo',[],()=>load())}
+function setup(){run('uiSetup',[],()=>load())}
+load();
+</script></body></html>
