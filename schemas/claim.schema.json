@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ECA-PQFA Claim",
+  "type": "object",
+  "required": [
+    "Case_ID",
+    "Claim_Form",
+    "Claim_Statement",
+    "Claimed_Scope"
+  ],
+  "properties": {
+    "Case_ID": {
+      "type": "string"
+    },
+    "Claim_Form": {
+      "enum": [
+        "EX",
+        "ST",
+        "CX",
+        "PD",
+        "IM",
+        "PR",
+        "NG",
+        "ID"
+      ]
+    },
+    "Claim_Statement": {
+      "type": "string",
+      "minLength": 1
+    },
+    "Claimed_Scope": {
+      "enum": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ]
+    },
+    "Verified_Scope": {
+      "enum": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "NOT_VERIFIED"
+      ]
+    },
+    "Origin": {
+      "enum": [
+        "AI",
+        "HUMAN",
+        "HYBRID",
+        "SYSTEM"
+      ]
+    },
+    "Assurance_State": {
+      "enum": [
+        "L0",
+        "L1",
+        "L2",
+        "L3"
+      ]
+    },
+    "L0": {
+      "enum": [
+        "TRUE",
+        "FALSE"
+      ]
+    },
+    "L1": {
+      "enum": [
+        "TRUE",
+        "FALSE"
+      ]
+    },
+    "L2": {
+      "enum": [
+        "TRUE",
+        "FALSE"
+      ]
+    },
+    "L3": {
+      "enum": [
+        "TRUE",
+        "FALSE"
+      ]
+    },
+    "Refuted": {
+      "enum": [
+        "TRUE",
+        "FALSE"
+      ]
+    }
+  }
+}
