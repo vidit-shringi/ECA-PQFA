@@ -243,7 +243,7 @@ ECA-PQFA/
 ├── data/
 │   ├── demo/
 │   └── synthetic/
-├── frontend/\n│   ├── index.html\n│   ├── app.js\n│   └── styles.css\n├── docs/
+├── docs/
 │   ├── TRP_CONTEXT.md
 │   ├── TOOL_SPEC.md
 │   ├── USING_AS_A_RESEARCH_TOOL.md
