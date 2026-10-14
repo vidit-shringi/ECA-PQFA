@@ -1,7 +1,29 @@
 from backend.app.services.hndl import hndl_assessment
+import pytest
+
 
 def test_hndl_split_and_bounds():
-    r=hndl_assessment('HIGH','BOTH','2026-01-01','2026-10-01',10,'2028-01-01',10,15,20,1,0.5)
+    r = hndl_assessment('HIGH','BOTH','2026-01-01','2026-10-01',10,'2028-01-01',10,15,20,1,0.5)
     assert r['retrospective_risk'] >= 0
     assert r['prospective_risk'] >= 0
     assert 0 <= r['exposure_probability'] <= 1
+
+
+def test_future_capture_date_rejected():
+    with pytest.raises(ValueError):
+        hndl_assessment('HIGH','BOTH','2027-01-01','2026-10-01',10,'2028-01-01',10,15,20)
+
+
+def test_bad_scenario_order_rejected():
+    with pytest.raises(ValueError):
+        hndl_assessment('HIGH','BOTH','2026-01-01','2026-10-01',10,'2028-01-01',20,15,10)
+
+
+def test_probability_out_of_range_rejected():
+    with pytest.raises(ValueError):
+        hndl_assessment('HIGH','BOTH','2026-01-01','2026-10-01',10,'2028-01-01',10,15,20,1,1.5)
+
+
+def test_unknown_exposure_rejected():
+    with pytest.raises(ValueError):
+        hndl_assessment('HIGH','UNKNOWN','2026-01-01','2026-10-01',10,'2028-01-01',10,15,20)
