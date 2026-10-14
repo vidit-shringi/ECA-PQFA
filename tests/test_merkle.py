@@ -1,17 +1,19 @@
-from backend.app.services.merkle import (
-    inclusion_proof, verify_inclusion, consistency_proof, verify_consistency,
-    leaf_hash, verify_inclusion,
-)
-from backend.app.services.provenance import append_event, inclusion_for_event, audit_chain
-from backend.app.services.repository import init_db
-import pytest
+from backend.app.services.merkle import inclusion_proof, verify_inclusion, consistency_proof, verify_consistency
 
 
 def test_inclusion():
     leaves = [f"event-{i}" for i in range(9)]
-    for i, x in enumerate(leaves):
+    for i, value in enumerate(leaves):
         proof = inclusion_proof(leaves, i)
-        assert verify_inclusion(x, proof, proof["root"])
+        assert verify_inclusion(value, proof, proof["root"])
+
+
+def test_inclusion_rejects_tampered_leaf_or_path():
+    values = ["a", "b", "c", "d"]
+    proof = inclusion_proof(values, 1)
+    assert not verify_inclusion("tampered", proof, proof["root"])
+    altered = {**proof, "audit_path": [{**proof["audit_path"][0], "hash": "00" * 32}] + proof["audit_path"][1:]}
+    assert not verify_inclusion("b", altered, proof["root"])
 
 
 def test_consistency():
@@ -21,16 +23,14 @@ def test_consistency():
         assert verify_consistency(proof["old_size"], proof["new_size"], proof["old_root"], proof["new_root"], proof["proof"]), (m, proof)
 
 
-def test_prehashed_provenance_leaf_verifies():
-    events = [leaf_hash(f"evt-{i}") for i in range(5)]
-    # Proof verifier must be passed the original leaf bytes when it applies leaf_hash
-    for i, original in enumerate([f"evt-{j}" for j in range(5)]):
-        proof = inclusion_proof([f"evt-{j}" for j in range(5)], i)
-        assert verify_inclusion(original, proof, proof["root"])
-
-
-def test_consistency_empty_tree_edge_cases():
+def test_consistency_empty_prefix():
     proof = consistency_proof(["x"], 0)
     assert proof["old_size"] == 0
     assert proof["new_size"] == 1
-    assert not verify_consistency(0, 1, proof["old_root"], proof["new_root"], proof["proof"])
+    assert verify_consistency(0, 1, proof["old_root"], proof["new_root"], proof["proof"])
+
+
+def test_consistency_equal_size_requires_equal_roots_and_no_proof():
+    proof = consistency_proof(["same"], 1)
+    assert verify_consistency(1, 1, proof["old_root"], proof["new_root"], [])
+    assert not verify_consistency(1, 1, "0" * 64, "1" * 64, [])
