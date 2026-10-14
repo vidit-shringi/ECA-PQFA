@@ -32,7 +32,7 @@ from backend.app.services.inventory import scan_directory
 from backend.app.services.metrics import evaluate
 from backend.app.services.merkle import (
     root_from_leaf_hashes,
-    verify_inclusion,
+    verify_inclusion_from_hash,
     verify_consistency,
 )
 from backend.app.services.provenance import (
@@ -364,7 +364,7 @@ def verify_inclusion_endpoint(event_id: str, tree_size: int | None = None):
         size = proof["tree_size"]
         hashes = event_hashes()[:size]
         root = root_from_leaf_hashes(hashes)
-        valid = verify_inclusion(bytes.fromhex(proof["leaf_hash"]), proof, root)
+        valid = verify_inclusion_from_hash(bytes.fromhex(proof["leaf_hash"]), proof, root)
         return {"valid": valid, "proof": proof, "root": root}
     except ValueError as exc:
         raise HTTPException(400, str(exc))
