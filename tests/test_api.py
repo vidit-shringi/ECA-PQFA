@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
-
 from backend.app.main import app
 
 
@@ -50,7 +49,7 @@ def test_scope_inflation_is_rejected():
         assert response.status_code == 200
         body = response.json()
         assert body["valid"] is False
-        assert body["scope_status"] == "VERIFIED_SCOPE_NARROWER"
+        assert body["scope_status"] == "SCOPE_INFLATION"
 
 
 def test_config_does_not_expose_integration_identifier():
@@ -62,3 +61,15 @@ def test_config_does_not_expose_integration_identifier():
         assert "evidence_root" not in body
         assert "spreadsheet_configured" in body
         assert "evidence_storage_configured" in body
+
+
+def test_mutation_requires_key_by_default(monkeypatch):
+    from backend.app.core.config import settings
+    monkeypatch.setattr(settings, "require_api_key", True)
+    monkeypatch.setattr(settings, "api_key", "test-secret-key")
+    with TestClient(app) as client:
+        response = client.post("/api/provenance/event", json={"Event_Type": "TEST"})
+        assert response.status_code == 401
+        response = client.post("/api/provenance/event", headers={"X-ECA-API-Key": "test-secret-key"},
+                               json={"Event_Type": "TEST"})
+        assert response.status_code == 200
