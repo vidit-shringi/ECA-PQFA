@@ -10,34 +10,34 @@ from backend.app.services.utilities import canonical_json, generate_id, sha256_b
 
 
 def _next_event_id() -> str:
-    # Keep the identifier namespace independent of the generic records table.
     with connect() as con:
         row = con.execute("SELECT event_id FROM provenance_events ORDER BY rowid DESC LIMIT 1").fetchone()
+    sequence = 1
     if row:
         try:
             sequence = int(str(row["event_id"]).rsplit("-", 1)[-1]) + 1
         except (TypeError, ValueError):
             sequence = 1
-    else:
-        sequence = 1
     return generate_id("05_PROVENANCE", sequence)
 
 
 def append_event(event: Dict[str, Any]) -> Dict[str, Any]:
     payload = dict(event)
-    payload.setdefault("Event_ID", _next_event_id())
-    event_id = str(payload["Event_ID"])
-    payload_hash = sha256_json(payload)
     with connect() as con:
-        # BEGIN IMMEDIATE serializes sequence assignment and the append transaction.
         con.execute("BEGIN IMMEDIATE")
-        row = con.execute("SELECT event_hash FROM provenance_events ORDER BY rowid DESC LIMIT 1").fetchone()
+        row = con.execute("SELECT event_id,event_hash FROM provenance_events ORDER BY rowid DESC LIMIT 1").fetchone()
+        if not payload.get("Event_ID"):
+            sequence = 1
+            if row:
+                try:
+                    sequence = int(str(row["event_id"]).rsplit("-", 1)[-1]) + 1
+                except (TypeError, ValueError):
+                    sequence = 1
+            payload["Event_ID"] = generate_id("05_PROVENANCE", sequence)
+        event_id = str(payload["Event_ID"])
+        payload_hash = sha256_json(payload)
         previous = row["event_hash"] if row else ""
-        material = canonical_json({
-            "event_id": event_id,
-            "payload_hash": payload_hash,
-            "previous_event_hash": previous,
-        })
+        material = canonical_json({"event_id": event_id, "payload_hash": payload_hash, "previous_event_hash": previous})
         event_hash = sha256_bytes(material.encode())
         con.execute(
             "INSERT INTO provenance_events(event_id,payload_json,event_hash,previous_event_hash,created_at) VALUES(?,?,?,?,?)",
@@ -61,8 +61,6 @@ def create_tree_head() -> Dict[str, Any]:
     hashes = event_hashes()
     size = len(hashes)
     root = root_from_leaf_hashes(hashes)
-    # Include size and root in the signed payload. A size-based ID can be reused on
-    # repeated snapshots; replace is intentional only for the same tree size/root.
     tree_id = f"STH-{size:08d}-{root[:12]}"
     payload = {"tree_head_id": tree_id, "tree_size": size, "merkle_root": root}
     signed = canonical_json(payload).encode()
@@ -117,8 +115,7 @@ def audit_chain() -> Dict[str, Any]:
         payload = json.loads(event["payload_json"])
         expected_payload = sha256_json(payload)
         expected_event = sha256_bytes(canonical_json({
-            "event_id": event["event_id"],
-            "payload_hash": expected_payload,
+            "event_id": event["event_id"], "payload_hash": expected_payload,
             "previous_event_hash": previous,
         }).encode())
         if event.get("previous_event_hash") != previous:
@@ -145,11 +142,9 @@ def audit_chain() -> Dict[str, Any]:
             size = int(head["tree_size"])
             expected_root = root_from_leaf_hashes(hashes[:size]) if 0 <= size <= len(hashes) else None
             head_consistent = (
-                signed.get("tree_size") == size
-                and signed.get("merkle_root") == head["merkle_root"]
-                and expected_root == head["merkle_root"]
-                and signature_valid is True
-                and (head.get("pq_signature") is None or pq_signature_valid is True)
+                signed.get("tree_size") == size and signed.get("merkle_root") == head["merkle_root"]
+                and expected_root == head["merkle_root"] and signature_valid is True
+                and (not head.get("pq_signature") or pq_signature_valid is True)
             )
             if not head_consistent:
                 valid = False
@@ -159,12 +154,8 @@ def audit_chain() -> Dict[str, Any]:
             head_consistent = False
             reasons.append(f"invalid tree head: {exc}")
     return {
-        "event_count": len(events),
-        "chain_valid": valid,
-        "merkle_root": root,
-        "latest_tree_head": head,
-        "tree_head_classical_signature_valid": signature_valid,
-        "tree_head_pq_signature_valid": pq_signature_valid,
-        "tree_head_consistent": head_consistent,
+        "event_count": len(events), "chain_valid": valid, "merkle_root": root,
+        "latest_tree_head": head, "tree_head_classical_signature_valid": signature_valid,
+        "tree_head_pq_signature_valid": pq_signature_valid, "tree_head_consistent": head_consistent,
         "reasons": reasons,
     }
