@@ -25,8 +25,8 @@ PATTERNS = {
 
 def detect_algorithms(data: bytes) -> List[str]:
     hits = []
-    for name, pats in PATTERNS.items():
-        if any(re.search(p, data, re.IGNORECASE) for p in pats):
+    for name, patterns in PATTERNS.items():
+        if any(re.search(pattern, data, re.IGNORECASE) for pattern in patterns):
             hits.append(name)
     return hits
 
@@ -36,18 +36,43 @@ def scan_directory(path: str, recursive: bool = True) -> Dict[str, object]:
     if not base.exists() or not base.is_dir():
         raise FileNotFoundError(base)
     iterator = base.rglob("*") if recursive else base.glob("*")
-    files = [p for p in iterator if p.is_file()]
     assets = []
     algorithms = set()
-    for p in files:
-        data = p.read_bytes()
-        algs = detect_algorithms(data)
-        algorithms.update(algs)
-        assets.append({"file_name":p.name,"relative_path":str(p.relative_to(base)),"size":len(data),"sha256":sha256_bytes(data),"sha3_256":sha3_256_bytes(data),"algorithms_detected":algs})
+    skipped_symlinks = 0
+    for candidate in iterator:
+        try:
+            resolved = candidate.resolve(strict=True)
+            # Do not let an in-root symlink cause reads outside the approved scan root.
+            if resolved != base and base not in resolved.parents:
+                skipped_symlinks += 1
+                continue
+            if not resolved.is_file():
+                continue
+            data = resolved.read_bytes()
+        except (OSError, RuntimeError):
+            skipped_symlinks += 1
+            continue
+        detected = detect_algorithms(data)
+        algorithms.update(detected)
+        assets.append({
+            "file_name": candidate.name,
+            "relative_path": str(candidate.relative_to(base)),
+            "size": len(data),
+            "sha256": sha256_bytes(data),
+            "sha3_256": sha3_256_bytes(data),
+            "algorithms_detected": detected,
+        })
+    warnings = ["String/OID scanning is an identification aid, not proof of implementation correctness or security."]
+    if skipped_symlinks:
+        warnings.append(f"Skipped {skipped_symlinks} unreadable, dangling, or out-of-root symlink path(s).")
     return {
-        "metadata":{"source_directory":str(base),"asset_count":len(assets)},
-        "algorithms":sorted(algorithms),
-        "components":[{"type":"cryptographic-algorithm","name":a,"properties":[{"name":"detection","value":"string/OID pattern"}]} for a in sorted(algorithms)],
-        "files":assets,
-        "warnings":["String/OID scanning is an identification aid, not proof of implementation correctness or security."]
+        "metadata": {"source_directory": str(base), "asset_count": len(assets)},
+        "algorithms": sorted(algorithms),
+        "components": [
+            {"type": "cryptographic-algorithm", "name": algorithm,
+             "properties": [{"name": "detection", "value": "string/OID pattern"}]}
+            for algorithm in sorted(algorithms)
+        ],
+        "files": assets,
+        "warnings": warnings,
     }
