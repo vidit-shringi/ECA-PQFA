@@ -17,6 +17,13 @@ def test_protocol_screening_fails_on_legacy_tls_marker(tmp_path: Path):
     assert result["result"] == "FAIL"
 
 
+def test_protocol_screening_never_passes_by_absence_of_known_strings(tmp_path: Path):
+    evidence = tmp_path / "tls.conf"
+    evidence.write_text("protocol=TLSv1.3; cipher=secure-looking-name", encoding="utf-8")
+    result = run_verification({"Claim_Form": "PR"}, str(evidence))
+    assert result["result"] == "INCONCLUSIVE"
+
+
 def test_ng_rejects_zero_effect(tmp_path: Path):
     result = run_verification({"Claim_Form": "NG", "sample_size": 25, "smallest_detectable_effect": 0})
     assert result["result"] == "FAIL"
