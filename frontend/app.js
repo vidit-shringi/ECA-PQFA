@@ -1,5 +1,8 @@
 async function request(path, options = {}) {
-  const response = await fetch(path, options);
+  const headers = new Headers(options.headers || {});
+  const apiKey = $("api-key") ? $("api-key").value.trim() : "";
+  if (apiKey) headers.set("X-ECA-API-Key", apiKey);
+  const response = await fetch(path, { ...options, headers });
   const data = await response.json().catch(function () { return { error: response.statusText }; });
   if (!response.ok) throw new Error(typeof data === "string" ? data : JSON.stringify(data, null, 2));
   return data;
