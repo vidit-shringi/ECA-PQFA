@@ -53,7 +53,23 @@ function nextId_(name) {
   const prefix = prefixes[name]; if (!prefix) return '';
   const year = Utilities.formatDate(new Date(),CONFIG.TZ,'yyyy');
   const width = name === '05_PROVENANCE' ? 5 : 4;
-  const pattern = new RegExp('^' + prefix + '-\\d{4}-(\\d+)
+  const pattern = new RegExp('^' + prefix + '-\\d{4}-(\\d+)$');
+  const key = 'ECA_PQFA_LAST_SEQUENCE_' + name;
+  const properties = PropertiesService.getScriptProperties();
+  let maximum = Number(properties.getProperty(key) || 0);
+  rows_(name).forEach(function(row) {
+    const match = pattern.exec(norm_(row[idField_(name)]));
+    if (match) maximum = Math.max(maximum, Number(match[1]));
+  });
+  const next = maximum + 1;
+  properties.setProperty(key, String(next));
+  return prefix + '-' + year + '-' + String(next).padStart(width,'0');
+}
+function withWriteLock_(action) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try { return action(); } finally { lock.releaseLock(); }
+}
 function sha256_(s) {
   const b = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,String(s),Utilities.Charset.UTF_8);
   return b.map(x => { const n = x < 0 ? x + 256 : x; return ('0' + n.toString(16)).slice(-2); }).join('');
