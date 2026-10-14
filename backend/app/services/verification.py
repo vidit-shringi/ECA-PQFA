@@ -81,9 +81,18 @@ def run_verification(claim: Dict[str, Any], evidence_path: str = "",
                if marker in text]
         fallback = "fallback" in text
         ok = bool(text.strip()) and not bad and not fallback
-        return _result(form, ok, verifier_id,
-                       {"warning_tokens": bad, "generic_fallback_token": fallback},
-                       "Heuristic protocol-configuration screening; absence of markers is not a security proof")
+        details = {"warning_tokens": bad, "generic_fallback_token": fallback}
+        if not text.strip():
+            return _result(form, False, verifier_id, details,
+                           "Heuristic protocol-configuration screening")
+        if bad or fallback:
+            return _result(form, False, verifier_id, details,
+                           "Heuristic protocol-configuration screening")
+        # Absence of a small set of insecure markers is insufficient to assert PASS.
+        result = _result(form, False, verifier_id, details,
+                         "Heuristic protocol-configuration screening; external validation required")
+        result["result"] = "INCONCLUSIVE"
+        return result
 
     if form in {"CX", "PD"}:
         exists = bool(evidence_path) and Path(evidence_path).expanduser().resolve().is_file()
