@@ -19,20 +19,20 @@ def test_missing_verified_scope():
 
 def test_claim_validation_rejects_inflation():
     result = validate_claim({
-        "case_id": "CASE-2026-0001",
-        "claim_form": "ID",
+        "case_id": "CASE-2026-0001", "claim_form": "ID",
         "claim_statement": "Synthetic identification claim.",
-        "claimed_scope": "A",
-        "verified_scope": "C",
-        "origin": "HUMAN",
+        "claimed_scope": "A", "verified_scope": "C", "origin": "HUMAN",
     })
     assert not result["valid"]
     assert result["scope_status"] == "SCOPE_INFLATION"
 
 
-def test_false_string_does_not_set_assurance_flags():
-    result = derived_claim_fields({"Origin": "HUMAN", "Claimed_Scope": "C", "Verified_Scope": "C",
-                                   "L0": "FALSE", "L1": "FALSE", "L2": "FALSE", "L3": "FALSE"})
-    assert result["Assurance_State"] == "L0"
-    assert result["L0"] == "TRUE"
-    assert result["L1"] == result["L2"] == result["L3"] == "FALSE"
+def test_assurance_flags_are_mutually_exclusive_and_false_is_false():
+    l0 = derived_claim_fields({"Origin": "HUMAN", "Claimed_Scope": "C", "Verified_Scope": "C",
+                               "L0": "FALSE", "L1": "FALSE", "L2": "FALSE", "L3": "FALSE"})
+    assert l0["Assurance_State"] == "L0"
+    assert [l0[k] for k in ("L0", "L1", "L2", "L3")] == ["TRUE", "FALSE", "FALSE", "FALSE"]
+    l2 = derived_claim_fields({"Origin": "HUMAN", "Claimed_Scope": "C", "Verified_Scope": "C",
+                               "L0": "FALSE", "L1": "FALSE", "L2": "TRUE", "L3": "FALSE"})
+    assert l2["Assurance_State"] == "L2"
+    assert [l2[k] for k in ("L0", "L1", "L2", "L3")] == ["FALSE", "FALSE", "TRUE", "FALSE"]
