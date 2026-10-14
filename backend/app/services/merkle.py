@@ -120,6 +120,50 @@ def verify_inclusion(leaf: bytes | str, proof: Dict[str, Any], expected_root: st
         return False
 
 
+def verify_inclusion_from_hash(leaf_digest: bytes | str, proof: Dict[str, Any], expected_root: str) -> bool:
+    """Verify inclusion when the Merkle leaf is already a 32-byte digest.
+
+    Provenance event hashes are committed as pre-hashed leaves, so they must not
+    pass through leaf_hash() again.
+    """
+    try:
+        digest = bytes.fromhex(leaf_digest) if isinstance(leaf_digest, str) else leaf_digest
+        if len(digest) != 32 or not isinstance(proof, dict) or len(expected_root) != 64:
+            return False
+        index, size = int(proof.get("leaf_index", -1)), int(proof.get("tree_size", 0))
+        if size <= 0 or index < 0 or index >= size:
+            return False
+        h, fn, sn = digest, index, size - 1
+        siblings = proof.get("audit_path", [])
+        if not isinstance(siblings, list):
+            return False
+        for item in siblings:
+            direction = item.get("direction") if isinstance(item, dict) else None
+            raw = item.get("hash") if isinstance(item, dict) else item
+            sibling = bytes.fromhex(raw)
+            if len(sibling) != 32 or sn == 0:
+                return False
+            if direction == "left":
+                h = node_hash(sibling, h)
+            elif direction == "right":
+                h = node_hash(h, sibling)
+            elif direction is None:
+                if (fn & 1) or fn == sn:
+                    h = node_hash(sibling, h)
+                    if not (fn & 1):
+                        while fn and not (fn & 1):
+                            fn >>= 1
+                            sn >>= 1
+                else:
+                    h = node_hash(h, sibling)
+            else:
+                return False
+            fn >>= 1
+            sn >>= 1
+        return sn == 0 and h.hex() == expected_root.lower()
+    except (TypeError, ValueError, KeyError, OverflowError):
+        return False
+
 def _largest_power_less_than(n: int) -> int:
     if n <= 1:
         return 0
@@ -146,6 +190,31 @@ def consistency_proof(items: Sequence[bytes | str], old_size: int) -> Dict[str, 
             "old_root": _mth(leaves[:old_size]).hex() if old_size else _sha(b"").hex(),
             "new_root": _mth(leaves).hex() if n else _sha(b"").hex(),
             "proof": proof, "format": "RFC6962-subtree-hashes"}
+
+
+def consistency_proof_from_hashes(hashes: Sequence[bytes | str], old_size: int) -> Dict[str, Any]:
+    """Build a consistency proof from already-hashed 32-byte leaves."""
+    leaves = []
+    try:
+        for item in hashes:
+            raw = bytes.fromhex(item) if isinstance(item, str) else item
+            if len(raw) != 32:
+                raise ValueError("leaves must contain 32-byte hashes")
+            leaves.append(raw)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("invalid pre-hashed Merkle leaves") from exc
+    n = len(leaves)
+    if not 0 <= old_size <= n:
+        raise ValueError("old_size must be between 0 and tree size")
+    proof = [] if old_size in (0, n) else [h.hex() for h in _consistency_proof(old_size, n, leaves, True)]
+    return {
+        "old_size": old_size,
+        "new_size": n,
+        "old_root": _mth(leaves[:old_size]).hex() if old_size else _sha(b"").hex(),
+        "new_root": _mth(leaves).hex() if n else _sha(b"").hex(),
+        "proof": proof,
+        "format": "RFC6962-subtree-hashes-prehashed",
+    }
 
 
 def verify_consistency(old_size: int, new_size: int, old_root: str, new_root: str,
