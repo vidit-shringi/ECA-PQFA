@@ -23,7 +23,6 @@ class Settings(BaseModel):
         "ECA_PQFA_ALLOWED_ORIGINS",
         "http://127.0.0.1:8000,http://localhost:8000",
     )
-    # Secure default: deployments must explicitly opt into unauthenticated local demos.
     require_api_key: bool = os.getenv("ECA_PQFA_REQUIRE_API_KEY", "true").strip().lower() == "true"
     allowed_path_roots: str = os.getenv("ECA_PQFA_ALLOWED_PATH_ROOTS", str(ROOT))
 
