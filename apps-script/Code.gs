@@ -51,8 +51,106 @@ function idField_(name) { return headers_(name).find(x => /_ID$/.test(x)) || '';
 function nextId_(name) {
   const prefixes = {'01_CASES':'CASE','02_EVIDENCE':'EVD','03_CLAIMS':'CLM','04_VERIFICATIONS':'VER','05_PROVENANCE':'EVT','06_ASSETS':'AST','07_ALGORITHMS':'ALG','08_IMPLEMENTATIONS':'IMP','09_PROTOCOLS':'PRT','10_DIGITAL_TWIN':'REL','11_HNDL_RISK':'RSK','12_MIGRATION':'MIG','13_EXPERIMENTS':'EXP','14_AUDIT_LOG':'AUD'};
   const prefix = prefixes[name]; if (!prefix) return '';
+  const year = Utilities.formatDate(new Date(),CONFIG.TZ,'yyyy');
   const width = name === '05_PROVENANCE' ? 5 : 4;
-  return prefix + '-' + Utilities.formatDate(new Date(),CONFIG.TZ,'yyyy') + '-' + String(Math.max(0,rows_(name).length - 1) + 1).padStart(width,'0');
+  const pattern = new RegExp('^' + prefix + '-\\d{4}-(\\d+)
+function sha256_(s) {
+  const b = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,String(s),Utilities.Charset.UTF_8);
+  return b.map(x => { const n = x < 0 ? x + 256 : x; return ('0' + n.toString(16)).slice(-2); }).join('');
+}
+function setup_() {
+  Object.keys(SHEETS).forEach(n => {
+    const sh = ss_().getSheetByName(n); if (!sh) throw new Error('Create required sheet before setup: ' + n);
+    const hs = SHEETS[n]; if (sh.getLastRow() === 0) sh.getRange(1,1,1,hs.length).setValues([hs]);
+    sh.setFrozenRows(1); sh.getRange(1,1,1,hs.length).setFontWeight('bold').setWrap(true);
+    try { sh.getDataRange().createFilter(); } catch (e) {}
+    sh.autoResizeColumns(1,Math.min(hs.length,12));
+  });
+  buildEnums_(); buildReadme_();
+  return {ok:true,version:CONFIG.VERSION,sheets:Object.keys(SHEETS).concat(['15_ENUMS','16_README'])};
+}
+function create_(name,record) {
+  const sh = sheet_(name), hs = headers_(name), r = Object.assign({},record || {}), idf = idField_(name);
+  if (idf && !norm_(r[idf])) r[idf] = nextId_(name);
+  if (idf && rows_(name).some(x => norm_(x[idf]) === norm_(r[idf]))) throw new Error('Duplicate ID: ' + r[idf]);
+  if (hs.includes('Created_At') && !norm_(r.Created_At)) r.Created_At = now_();
+  if (hs.includes('Last_Updated') && !norm_(r.Last_Updated)) r.Last_Updated = now_();
+  sh.appendRow(hs.map(h => Object.prototype.hasOwnProperty.call(r,h) ? r[h] : ''));
+  return r;
+}
+function upsert_(name,record) {
+  const sh = sheet_(name), hs = headers_(name), idf = idField_(name), r = Object.assign({},record || {});
+  if (!idf) throw new Error('No ID field');
+  if (!norm_(r[idf])) r[idf] = nextId_(name);
+  const values = sh.getDataRange().getValues(); let row = -1;
+  for (let i = 1; i < values.length; i++) if (norm_(values[i][hs.indexOf(idf)]) === norm_(r[idf])) { row = i + 1; break; }
+  if (row < 0) return create_(name,r);
+  hs.forEach((h,j) => { if (Object.prototype.hasOwnProperty.call(r,h) && h !== idf) sh.getRange(row,j+1).setValue(r[h]); });
+  if (hs.includes('Last_Updated')) sh.getRange(row,hs.indexOf('Last_Updated')+1).setValue(now_());
+  return r;
+}
+function list_(name) { return rows_(name).map(o => { delete o.__row; return o; }); }
+
+function doGet(e) {
+  try {
+    const a = (e && e.parameter && e.parameter.action) || 'health';
+    if (a === 'health') return json_({ok:true,version:CONFIG.VERSION,timestamp:now_()});
+    if (a === 'list') {
+      const ar = auth_(e.parameter); if (!ar.ok) return json_(ar);
+      return json_({ok:true,data:list_(e.parameter.sheet)});
+    }
+    return json_({ok:false,error:'Unknown action'});
+  } catch (err) { return json_({ok:false,error:String(err)}); }
+}
+function doPost(e) {
+  try {
+    const p = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    if (p.action === 'health') return json_({ok:true,version:CONFIG.VERSION,timestamp:now_()});
+    const ar = auth_(p); if (!ar.ok) return json_(ar);
+    if (p.action === 'setup') return json_(setup_());
+    if (p.action === 'list') return json_({ok:true,data:list_(p.sheet)});
+    if (p.action === 'create') return json_({ok:true,data:create_(p.sheet,p.record || {})});
+    if (p.action === 'upsert') return json_({ok:true,data:upsert_(p.sheet,p.record || {})});
+    if (p.action === 'ping') return json_({ok:true,data:'ECA-PQFA Sheets bridge online'});
+    return json_({ok:false,error:'Unknown action'});
+  } catch (err) { return json_({ok:false,error:String(err)}); }
+}
+
+function buildEnums_() {
+  const sh = ss_().getSheetByName('15_ENUMS'); if (!sh) return;
+  sh.clear();
+  const groups = {Claim_Forms:['EX','ST','CX','PD','IM','PR','NG','ID'],Scopes:['A','B','C','D','NOT_VERIFIED'],Assurance:['L0','L1','L2','L3'],Origins:['AI','HUMAN','HYBRID','SYSTEM'],Verification_Result:['PASS','FAIL','INCONCLUSIVE','NOT_RUN'],Independence:['NOT_REQUIRED','PENDING','INDEPENDENT','NOT_INDEPENDENT','FAILED'],Risk:['LOW','MEDIUM','HIGH','CRITICAL'],Migration:['NOT_STARTED','IN_PROGRESS','PARTIAL','VERIFIED','FAILED','NOT_APPLICABLE']};
+  const names = Object.keys(groups); sh.getRange(1,1,1,names.length).setValues([names]).setFontWeight('bold');
+  const max = Math.max.apply(null,names.map(k => groups[k].length)), rows = [];
+  for (let i=0;i<max;i++) rows.push(names.map(k => groups[k][i] || ''));
+  if (rows.length) sh.getRange(2,1,rows.length,names.length).setValues(rows);
+  sh.setFrozenRows(1);
+}
+function buildReadme_() {
+  const sh = ss_().getSheetByName('16_README'); if (!sh) return;
+  sh.clear();
+  const rows = [
+    ['ECA-PQFA','Evidence-Carrying AI-Assisted Cryptanalysis and Post-Quantum Forensic Assurance'],
+    ['Purpose','University research-tool persistence layer and audit console.'],
+    ['H/W/E/V/P','Hypothesis / Witness / Experimental evidence / Verification / Provenance'],
+    ['Scopes','A design; B reduced-parameter; C implementation; D protocol.'],
+    ['Assurance','L0 hypothesis; L1 executable support; L2 independent reproduction; L3 formal verification.'],
+    ['Sheets role','Google Sheets stores structured metadata. It is not itself an immutable forensic ledger.'],
+    ['Evidence role','Store large artifacts externally; record Drive/file identifiers and SHA-256/SHA3-256 hashes here.'],
+    ['Integrity','Python backend computes hash-chain and Merkle commitments and verifies signed tree heads.'],
+    ['AI rule','AI-generated output is provenance/origin metadata and cannot independently promote assurance.'],
+    ['Research integrity','No fabricated experimental results; synthetic demo records must remain labelled SYNTHETIC/DEMO.'],
+    ['Security','For confidential work configure an API key and use authenticated access. Do not publish secrets in Apps Script source.']
+  ];
+  sh.getRange(1,1,rows.length,2).setValues(rows); sh.setFrozenRows(1); sh.autoResizeColumns(1,2);
+}
+);
+  let maximum = 0;
+  rows_(name).forEach(function(row) {
+    const match = pattern.exec(norm_(row[idField_(name)]));
+    if (match) maximum = Math.max(maximum, Number(match[1]));
+  });
+  return prefix + '-' + year + '-' + String(maximum + 1).padStart(width,'0');
 }
 function sha256_(s) {
   const b = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,String(s),Utilities.Charset.UTF_8);
