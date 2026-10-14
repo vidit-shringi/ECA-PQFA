@@ -1,15 +1,17 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from typing import Any, Dict, Optional
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 
 class RecordRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     sheet: str
     record: Dict[str, Any] = Field(default_factory=dict)
 
 
 class UpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     sheet: str
     id_field: Optional[str] = None
     id_value: str
@@ -17,6 +19,7 @@ class UpdateRequest(BaseModel):
 
 
 class ClaimRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     case_id: str
     claim_form: str
     claim_statement: str
@@ -32,17 +35,42 @@ class ClaimRequest(BaseModel):
     witness_id: str = ""
     verification_id: str = ""
 
+    @field_validator("case_id", "claim_statement", "claim_form", "claimed_scope")
+    @classmethod
+    def non_empty_required(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("field must not be empty")
+        return value
+
+    @field_validator("claim_form")
+    @classmethod
+    def normalize_claim_form(cls, value: str) -> str:
+        return value.strip().upper()
+
+    @field_validator("claimed_scope", "verified_scope")
+    @classmethod
+    def normalize_scope(cls, value: str) -> str:
+        return value.strip().upper()
+
+    @field_validator("origin")
+    @classmethod
+    def normalize_origin(cls, value: str) -> str:
+        return value.strip().upper()
+
 
 class EvidenceFileRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     path: str
 
 
 class InventoryRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     path: str
     recursive: bool = True
 
 
 class RelationshipRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     case_id: str
     source_id: str
     source_type: str
@@ -57,6 +85,7 @@ class RelationshipRequest(BaseModel):
 
 
 class HNDLRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     sensitivity: str = "MEDIUM"
     exposure_type: str = "RETROSPECTIVE"
     capture_date: str
