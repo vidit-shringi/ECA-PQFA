@@ -85,10 +85,15 @@ def hndl_assessment(
     age = years_between(cap, cur)
     horizon = age + lifetime
     scenarios = {"optimistic": optimistic, "median": median, "pessimistic": pessimistic}
+    # Keep the three named scenarios deterministic; the separate interpolated CDF
+    # is exposed for sensitivity analysis and is explicitly uncalibrated.
     retrospective = {
-        name: round(s * probability * break_cdf(horizon, optimistic, median, pessimistic), 6)
-        for name in scenarios
+        name: round(s * probability * (1.0 if horizon >= break_year else 0.0), 6)
+        for name, break_year in scenarios.items()
     }
+    distributional_retrospective = round(
+        s * probability * break_cdf(horizon, optimistic, median, pessimistic), 6
+    )
     migration_years = years_between(cur, mig)
     steps = 120
     prospective = {name: 0.0 for name in scenarios}
@@ -100,7 +105,7 @@ def hndl_assessment(
                 t_from_now = (j + 0.5) * dt
                 # Future generated data starts now, so its protected lifetime is L,
                 # not the already-captured artifact's current age plus L.
-                probability_broken = break_cdf(t_from_now + lifetime, optimistic, median, pessimistic)
+                probability_broken = 1.0 if (t_from_now + lifetime) >= break_year else 0.0
                 total += rate * probability * probability_broken * dt
             prospective[name] = round(s * total, 6)
 
@@ -123,6 +128,7 @@ def hndl_assessment(
         "migration_window_years": round(migration_years, 4),
         "retrospective_scenarios": retrospective,
         "prospective_scenarios": prospective,
+        "distributional_retrospective_sensitivity_weighted": distributional_retrospective,
         "cdf_quantile_convention": {"optimistic": 0.1, "median": 0.5, "pessimistic": 0.9},
         "warning": "The quantile interpolation is uncalibrated and must not be presented as validated CRQC probability. Calibrate the distribution and exposure-rate assumptions before scientific or operational use.",
     }
