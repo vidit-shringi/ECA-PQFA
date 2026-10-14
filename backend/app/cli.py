@@ -27,6 +27,14 @@ def _hash_file(path: str) -> dict[str, str | int]:
 
 def cmd_serve(args: argparse.Namespace) -> int:
     import uvicorn
+    from backend.app.core.config import settings
+
+    loopback_hosts = {"127.0.0.1", "localhost", "::1"}
+    if args.host not in loopback_hosts:
+        if not settings.require_api_key:
+            raise ValueError("Refusing non-loopback bind without ECA_PQFA_REQUIRE_API_KEY=true")
+        if not settings.api_key or settings.api_key == "CHANGE_ME_FOR_SHARED_DEPLOYMENTS":
+            raise ValueError("Configure a unique ECA_PQFA_API_KEY before binding to a network interface")
 
     uvicorn.run(
         "backend.app.main:app",
