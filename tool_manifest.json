@@ -1,6 +1,6 @@
 {
   "name": "ECA-PQFA",
-  "version": "3.2.0",
+  "version": "3.2.1",
   "title": "Evidence-Carrying AI-Assisted Cryptanalysis and Post-Quantum Forensic Assurance",
   "type": "complete-research-tool",
   "entrypoints": {
