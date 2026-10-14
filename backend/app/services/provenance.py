@@ -33,6 +33,8 @@ def append_event(event: Dict[str, Any]) -> Dict[str, Any]:
                     sequence = int(str(row["event_id"]).rsplit("-", 1)[-1]) + 1
                 except (TypeError, ValueError):
                     sequence = 1
+            while con.execute("SELECT 1 FROM provenance_events WHERE event_id=?", (generate_id("05_PROVENANCE", sequence),)).fetchone():
+                sequence += 1
             payload["Event_ID"] = generate_id("05_PROVENANCE", sequence)
         event_id = str(payload["Event_ID"])
         payload_hash = sha256_json(payload)
