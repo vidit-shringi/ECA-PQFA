@@ -75,11 +75,11 @@ def derived_claim_fields(c: Dict[str, Any]) -> Dict[str, Any]:
     l3 = _truth(r.get("L3", "FALSE"))
     l2 = _truth(r.get("L2", "FALSE"))
     l1 = _truth(r.get("L1", "FALSE"))
-    l0 = _truth(r.get("L0", "FALSE"))
     r["Assurance_State"] = "L3" if l3 else "L2" if l2 else "L1" if l1 else "L0"
-    r["L0"] = "TRUE" if l0 or not (l1 or l2 or l3) else "FALSE"
-    r["L1"] = "TRUE" if l1 or l2 or l3 else "FALSE"
-    r["L2"] = "TRUE" if l2 or l3 else "FALSE"
+    # Store one categorical assurance state, not overlapping cumulative counters.
+    r["L0"] = "TRUE" if not (l1 or l2 or l3) else "FALSE"
+    r["L1"] = "TRUE" if l1 and not (l2 or l3) else "FALSE"
+    r["L2"] = "TRUE" if l2 and not l3 else "FALSE"
     r["L3"] = "TRUE" if l3 else "FALSE"
     if str(r.get("Origin", "")).upper() == "AI" and r["Assurance_State"] in {"L1", "L2", "L3"}:
         r["Notes"] = (str(r.get("Notes", "")) + " AI output alone does not establish assurance; backend evidence/verification required.").strip()
