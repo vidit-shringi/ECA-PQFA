@@ -123,10 +123,10 @@ function doPost(e) {
     const p = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     if (p.action === 'health') return json_({ok:true,version:CONFIG.VERSION,timestamp:now_()});
     const ar = auth_(p); if (!ar.ok) return json_(ar);
-    if (p.action === 'setup') return json_(setup_());
+    if (p.action === 'setup') return json_(withWriteLock_(setup_));
     if (p.action === 'list') return json_({ok:true,data:list_(p.sheet)});
-    if (p.action === 'create') return json_({ok:true,data:create_(p.sheet,p.record || {})});
-    if (p.action === 'upsert') return json_({ok:true,data:upsert_(p.sheet,p.record || {})});
+    if (p.action === 'create') return json_(withWriteLock_(function(){ return {ok:true,data:create_(p.sheet,p.record || {})}; }));
+    if (p.action === 'upsert') return json_(withWriteLock_(function(){ return {ok:true,data:upsert_(p.sheet,p.record || {})}; }));
     if (p.action === 'ping') return json_({ok:true,data:'ECA-PQFA Sheets bridge online'});
     return json_({ok:false,error:'Unknown action'});
   } catch (err) { return json_({ok:false,error:String(err)}); }
