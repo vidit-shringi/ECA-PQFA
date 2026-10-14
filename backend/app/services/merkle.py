@@ -30,18 +30,23 @@ def _mth(items: Sequence[bytes]) -> bytes:
     return node_hash(_mth(items[:k]), _mth(items[k:]))
 
 
+def _decode_hashes(hashes: Sequence[str]) -> List[bytes]:
+    try:
+        values = [bytes.fromhex(x) for x in hashes]
+    except (TypeError, ValueError) as exc:
+        raise ValueError("leaf hashes must be hexadecimal SHA-256 digests") from exc
+    if any(len(x) != 32 for x in values):
+        raise ValueError("leaf hashes must be 32-byte SHA-256 digests")
+    return values
+
+
 def root_from_bytes(items: Sequence[bytes | str]) -> str:
     return _mth([leaf_hash(x) for x in items]).hex()
 
 
 def root_from_leaf_hashes(hashes: Sequence[str]) -> str:
-    try:
-        raw = [bytes.fromhex(h) for h in hashes]
-    except (TypeError, ValueError) as exc:
-        raise ValueError("leaf hashes must be hexadecimal SHA-256 digests") from exc
-    if any(len(x) != 32 for x in raw):
-        raise ValueError("leaf hashes must be 32-byte SHA-256 digests")
-    return _mth(raw).hex() if raw else _sha(b"").hex()
+    values = _decode_hashes(hashes)
+    return (_mth(values) if values else _sha(b"")).hex()
 
 
 def inclusion_proof(items: Sequence[bytes | str], index: int) -> Dict[str, Any]:
@@ -71,38 +76,27 @@ def inclusion_proof_from_hashes(leaves: Sequence[bytes], index: int) -> Dict[str
         return walk(xs[k:], idx - k)
 
     walk(leaves, index)
-    return {
-        "leaf_index": index,
-        "tree_size": len(leaves),
-        "leaf_hash": leaves[index].hex(),
-        "audit_path": list(reversed(path)),
-        "root": _mth(leaves).hex(),
-    }
+    return {"leaf_index": index, "tree_size": len(leaves), "leaf_hash": leaves[index].hex(),
+            "audit_path": list(reversed(path)), "root": _mth(leaves).hex()}
 
 
 def verify_inclusion(leaf: bytes | str, proof: Dict[str, Any], expected_root: str) -> bool:
-    """Verify a proof for an original leaf value (the function hashes it once)."""
+    """Verify inclusion for the original leaf value, hashing it exactly once."""
     try:
         if not isinstance(proof, dict):
             return False
-        index = int(proof.get("leaf_index", -1))
-        size = int(proof.get("tree_size", 0))
+        index, size = int(proof.get("leaf_index", -1)), int(proof.get("tree_size", 0))
         if size <= 0 or index < 0 or index >= size or len(expected_root) != 64:
             return False
-        path = proof.get("audit_path", [])
-        if not isinstance(path, list):
+        siblings = proof.get("audit_path", [])
+        if not isinstance(siblings, list):
             return False
-        siblings = []
-        for item in path:
-            hex_digest = item.get("hash") if isinstance(item, dict) else item
-            digest = bytes.fromhex(hex_digest)
-            if len(digest) != 32:
-                return False
-            siblings.append((item.get("direction") if isinstance(item, dict) else None, digest))
-        h = leaf_hash(leaf)
-        fn, sn = index, size - 1
-        for direction, sibling in siblings:
-            if sn == 0:
+        h, fn, sn = leaf_hash(leaf), index, size - 1
+        for item in siblings:
+            direction = item.get("direction") if isinstance(item, dict) else None
+            raw = item.get("hash") if isinstance(item, dict) else item
+            sibling = bytes.fromhex(raw)
+            if len(sibling) != 32 or sn == 0:
                 return False
             if direction == "left":
                 h = node_hash(sibling, h)
@@ -148,31 +142,33 @@ def consistency_proof(items: Sequence[bytes | str], old_size: int) -> Dict[str, 
     if not 0 <= old_size <= n:
         raise ValueError("old_size must be between 0 and tree size")
     proof = [] if old_size in (0, n) else [h.hex() for h in _consistency_proof(old_size, n, leaves, True)]
-    return {
-        "old_size": old_size,
-        "new_size": n,
-        "old_root": _mth(leaves[:old_size]).hex() if old_size else _sha(b"").hex(),
-        "new_root": _mth(leaves).hex() if n else _sha(b"").hex(),
-        "proof": proof,
-        "format": "RFC6962-subtree-hashes",
-    }
+    return {"old_size": old_size, "new_size": n,
+            "old_root": _mth(leaves[:old_size]).hex() if old_size else _sha(b"").hex(),
+            "new_root": _mth(leaves).hex() if n else _sha(b"").hex(),
+            "proof": proof, "format": "RFC6962-subtree-hashes"}
 
 
-def verify_consistency(old_size: int, new_size: int, old_root: str, new_root: str, proof_hex: Sequence[str]) -> bool:
+def verify_consistency(old_size: int, new_size: int, old_root: str, new_root: str,
+                       proof_hex: Sequence[str]) -> bool:
+    """Verify the consistency of two Merkle tree snapshots, including empty prefixes."""
     try:
         if old_size < 0 or new_size < old_size or len(old_root) != 64 or len(new_root) != 64:
             return False
+        empty_root = _sha(b"").hex()
         if old_size == 0:
-            return not proof_hex and old_root.lower() == _sha(b"").hex() and (new_size == 0 or new_root.lower() != "")
+            return not proof_hex and old_root.lower() == empty_root
         if old_size == new_size:
             return not proof_hex and old_root.lower() == new_root.lower()
         if old_size > new_size or not proof_hex:
             return False
-        path = [bytes.fromhex(x) for x in proof_hex]
-        if any(len(x) != 32 for x in path):
+        path = _decode_hashes(proof_hex)
+        old_root_bytes = bytes.fromhex(old_root)
+        if len(old_root_bytes) != 32:
             return False
         if old_size & (old_size - 1) == 0:
-            path = [bytes.fromhex(old_root)] + path
+            path = [old_root_bytes] + path
+        if not path:
+            return False
         fn, sn = old_size - 1, new_size - 1
         while fn & 1:
             fn >>= 1
