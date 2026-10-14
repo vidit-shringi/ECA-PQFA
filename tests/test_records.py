@@ -4,7 +4,7 @@ from backend.app.services.repository import init_db
 
 def test_ids_not_reused_after_delete(tmp_path, monkeypatch):
     db = tmp_path / "records.sqlite3"
-    monkeypatch.setattr("backend.app.core.config.DB_PATH", db)
+    monkeypatch.setattr("backend.app.services.repository.DB_PATH", db)
     init_db()
     first = create("01_CASES", {"Case_Name": "one"})
     delete("01_CASES", first["Case_ID"])
