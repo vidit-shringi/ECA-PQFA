@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-VERSION = "3.2.0"
+VERSION = "3.2.1"
 
 
 def _hash_file(path: str) -> dict[str, str | int]:
