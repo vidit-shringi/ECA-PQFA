@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, List
 
-from backend.app.services.merkle import root_from_leaf_hashes, inclusion_proof_from_hashes, consistency_proof
+from backend.app.services.merkle import root_from_leaf_hashes, inclusion_proof_from_hashes, consistency_proof_from_hashes
 from backend.app.services.repository import connect, utc_now
 from backend.app.services.signing import sign_hybrid, verify_classical, verify_mldsa
 from backend.app.services.utilities import canonical_json, generate_id, sha256_bytes, sha256_json
@@ -102,7 +102,7 @@ def consistency(old_size: int, new_size: int | None = None) -> Dict[str, Any]:
     size = n if new_size is None else new_size
     if old_size < 0 or size < 0 or size > n or old_size > size:
         raise ValueError("invalid tree sizes")
-    return consistency_proof([bytes.fromhex(e["event_hash"]) for e in events[:size]], old_size)
+    return consistency_proof_from_hashes([e["event_hash"] for e in events[:size]], old_size)
 
 
 def audit_chain() -> Dict[str, Any]:
