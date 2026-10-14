@@ -44,7 +44,8 @@ from backend.app.services.provenance import (
     event_hashes,
     inclusion_for_event,
 )
-from backend.app.services.records import count_records, create, delete, get, list_, update
+from backend.app.services.records import create, delete, get, list_, update
+from backend.app.services.repository import count_records
 from backend.app.services.repository import init_db
 from backend.app.services.sheets import SheetsClient
 from backend.app.services.utilities import ID_FIELDS, now
