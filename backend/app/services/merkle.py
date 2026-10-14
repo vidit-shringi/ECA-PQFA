@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import hashlib
-from typing import Any, Dict, List, Sequence, Tuple
+from typing import Any, Dict, List, Sequence
 
 
 def _sha(data: bytes) -> bytes:
@@ -31,24 +31,30 @@ def _mth(items: Sequence[bytes]) -> bytes:
 
 
 def root_from_bytes(items: Sequence[bytes | str]) -> str:
-    leaves = [leaf_hash(x) for x in items]
-    return _mth(leaves).hex()
+    return _mth([leaf_hash(x) for x in items]).hex()
 
 
 def root_from_leaf_hashes(hashes: Sequence[str]) -> str:
-    return _mth([bytes.fromhex(h) for h in hashes]).hex() if hashes else _sha(b"").hex()
+    try:
+        raw = [bytes.fromhex(h) for h in hashes]
+    except (TypeError, ValueError) as exc:
+        raise ValueError("leaf hashes must be hexadecimal SHA-256 digests") from exc
+    if any(len(x) != 32 for x in raw):
+        raise ValueError("leaf hashes must be 32-byte SHA-256 digests")
+    return _mth(raw).hex() if raw else _sha(b"").hex()
 
 
 def inclusion_proof(items: Sequence[bytes | str], index: int) -> Dict[str, Any]:
     if not 0 <= index < len(items):
         raise IndexError("leaf index out of range")
-    leaves = [leaf_hash(x) for x in items]
-    return inclusion_proof_from_hashes(leaves, index)
+    return inclusion_proof_from_hashes([leaf_hash(x) for x in items], index)
 
 
 def inclusion_proof_from_hashes(leaves: Sequence[bytes], index: int) -> Dict[str, Any]:
     if not 0 <= index < len(leaves):
         raise IndexError("leaf index out of range")
+    if any(len(x) != 32 for x in leaves):
+        raise ValueError("leaves must contain 32-byte hashes")
     path: List[Dict[str, str]] = []
 
     def walk(xs: Sequence[bytes], idx: int) -> bytes:
@@ -59,48 +65,75 @@ def inclusion_proof_from_hashes(leaves: Sequence[bytes], index: int) -> Dict[str
         if k == n:
             k //= 2
         if idx < k:
-            sibling = _mth(xs[k:])
-            path.append({"direction": "right", "hash": sibling.hex()})
+            path.append({"direction": "right", "hash": _mth(xs[k:]).hex()})
             return walk(xs[:k], idx)
-        sibling = _mth(xs[:k])
-        path.append({"direction": "left", "hash": sibling.hex()})
+        path.append({"direction": "left", "hash": _mth(xs[:k]).hex()})
         return walk(xs[k:], idx - k)
 
     walk(leaves, index)
-    root = _mth(leaves).hex()
-    return {"leaf_index": index, "tree_size": len(leaves), "leaf_hash": leaves[index].hex(), "audit_path": list(reversed(path)), "root": root}
+    return {
+        "leaf_index": index,
+        "tree_size": len(leaves),
+        "leaf_hash": leaves[index].hex(),
+        "audit_path": list(reversed(path)),
+        "root": _mth(leaves).hex(),
+    }
 
 
 def verify_inclusion(leaf: bytes | str, proof: Dict[str, Any], expected_root: str) -> bool:
-    # RFC 9162-style verification using the supplied tree index/size.
-    h = leaf_hash(leaf)
-    fn = int(proof.get("leaf_index", -1)); sn = int(proof.get("tree_size", 0)) - 1
-    if fn < 0 or sn < fn:
-        return False
-    path = [bytes.fromhex(x["hash"]) if isinstance(x, dict) else bytes.fromhex(x) for x in proof.get("audit_path", [])]
-    for p in path:
-        if sn == 0:
+    """Verify a proof for an original leaf value (the function hashes it once)."""
+    try:
+        if not isinstance(proof, dict):
             return False
-        if (fn & 1) or fn == sn:
-            h = node_hash(p, h)
-            if not (fn & 1):
-                while fn and not (fn & 1):
-                    fn >>= 1; sn >>= 1
-        else:
-            h = node_hash(h, p)
-        fn >>= 1; sn >>= 1
-    return sn == 0 and h.hex() == expected_root.lower()
+        index = int(proof.get("leaf_index", -1))
+        size = int(proof.get("tree_size", 0))
+        if size <= 0 or index < 0 or index >= size or len(expected_root) != 64:
+            return False
+        path = proof.get("audit_path", [])
+        if not isinstance(path, list):
+            return False
+        siblings = []
+        for item in path:
+            hex_digest = item.get("hash") if isinstance(item, dict) else item
+            digest = bytes.fromhex(hex_digest)
+            if len(digest) != 32:
+                return False
+            siblings.append((item.get("direction") if isinstance(item, dict) else None, digest))
+        h = leaf_hash(leaf)
+        fn, sn = index, size - 1
+        for direction, sibling in siblings:
+            if sn == 0:
+                return False
+            if direction == "left":
+                h = node_hash(sibling, h)
+            elif direction == "right":
+                h = node_hash(h, sibling)
+            elif direction is None:
+                if (fn & 1) or fn == sn:
+                    h = node_hash(sibling, h)
+                    if not (fn & 1):
+                        while fn and not (fn & 1):
+                            fn >>= 1
+                            sn >>= 1
+                else:
+                    h = node_hash(h, sibling)
+            else:
+                return False
+            fn >>= 1
+            sn >>= 1
+        return sn == 0 and h.hex() == expected_root.lower()
+    except (TypeError, ValueError, KeyError, OverflowError):
+        return False
 
 
 def _largest_power_less_than(n: int) -> int:
     if n <= 1:
         return 0
-    return 1 << (n.bit_length() - 1) if (1 << (n.bit_length() - 1)) < n else 1 << (n.bit_length() - 2)
+    p = 1 << (n.bit_length() - 1)
+    return p if p < n else p >> 1
 
 
 def _consistency_proof(m: int, n: int, leaves: Sequence[bytes], complete: bool) -> List[bytes]:
-    # RFC 6962-style recursive consistency proof. The proof is represented as
-    # subtree hashes, while the verifier reconstructs both roots from the prefix.
     if m == n:
         return [] if complete else [_mth(leaves[:n])]
     k = _largest_power_less_than(n)
@@ -114,10 +147,7 @@ def consistency_proof(items: Sequence[bytes | str], old_size: int) -> Dict[str, 
     n = len(leaves)
     if not 0 <= old_size <= n:
         raise ValueError("old_size must be between 0 and tree size")
-    if old_size == 0 or old_size == n:
-        proof: List[str] = []
-    else:
-        proof = [h.hex() for h in _consistency_proof(old_size, n, leaves, True)]
+    proof = [] if old_size in (0, n) else [h.hex() for h in _consistency_proof(old_size, n, leaves, True)]
     return {
         "old_size": old_size,
         "new_size": n,
@@ -129,23 +159,39 @@ def consistency_proof(items: Sequence[bytes | str], old_size: int) -> Dict[str, 
 
 
 def verify_consistency(old_size: int, new_size: int, old_root: str, new_root: str, proof_hex: Sequence[str]) -> bool:
-    # RFC 9162 Section 2.1.4.2 verifier.
-    if old_size <= 0 or old_size >= new_size or not proof_hex:
-        return old_size == new_size and old_root.lower() == new_root.lower() and not proof_hex
-    path=[bytes.fromhex(x) for x in proof_hex]
-    if old_size & (old_size-1) == 0:
-        path=[bytes.fromhex(old_root)]+path
-    fn=old_size-1; sn=new_size-1
-    while fn & 1:
-        fn >>= 1; sn >>= 1
-    fr=path[0]; sr=path[0]
-    for c in path[1:]:
-        if sn==0: return False
-        if (fn & 1) or fn==sn:
-            fr=node_hash(c,fr); sr=node_hash(c,sr)
-            if not (fn & 1):
-                while fn and not (fn & 1): fn >>= 1; sn >>= 1
-        else:
-            sr=node_hash(sr,c)
-        fn >>= 1; sn >>= 1
-    return sn==0 and fr.hex()==old_root.lower() and sr.hex()==new_root.lower()
+    try:
+        if old_size < 0 or new_size < old_size or len(old_root) != 64 or len(new_root) != 64:
+            return False
+        if old_size == 0:
+            return not proof_hex and old_root.lower() == _sha(b"").hex() and (new_size == 0 or new_root.lower() != "")
+        if old_size == new_size:
+            return not proof_hex and old_root.lower() == new_root.lower()
+        if old_size > new_size or not proof_hex:
+            return False
+        path = [bytes.fromhex(x) for x in proof_hex]
+        if any(len(x) != 32 for x in path):
+            return False
+        if old_size & (old_size - 1) == 0:
+            path = [bytes.fromhex(old_root)] + path
+        fn, sn = old_size - 1, new_size - 1
+        while fn & 1:
+            fn >>= 1
+            sn >>= 1
+        fr = sr = path[0]
+        for c in path[1:]:
+            if sn == 0:
+                return False
+            if (fn & 1) or fn == sn:
+                fr = node_hash(c, fr)
+                sr = node_hash(c, sr)
+                if not (fn & 1):
+                    while fn and not (fn & 1):
+                        fn >>= 1
+                        sn >>= 1
+            else:
+                sr = node_hash(sr, c)
+            fn >>= 1
+            sn >>= 1
+        return sn == 0 and fr.hex() == old_root.lower() and sr.hex() == new_root.lower()
+    except (TypeError, ValueError, IndexError):
+        return False
