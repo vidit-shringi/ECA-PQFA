@@ -30,6 +30,11 @@ from backend.app.services.claims import derived_claim_fields, validate_claim
 from backend.app.services.hndl import hndl_assessment
 from backend.app.services.inventory import scan_directory
 from backend.app.services.metrics import evaluate
+from backend.app.services.merkle import (
+    root_from_leaf_hashes,
+    verify_inclusion,
+    verify_consistency,
+)
 from backend.app.services.provenance import (
     all_events,
     append_event,
@@ -42,13 +47,13 @@ from backend.app.services.provenance import (
 from backend.app.services.records import count_records, create, delete, get, list_, update
 from backend.app.services.repository import init_db
 from backend.app.services.sheets import SheetsClient
-from backend.app.services.signing import verify_classical, verify_mldsa
-from backend.app.services.utilities import ID_FIELDS, generate_id, now
+from backend.app.services.utilities import ID_FIELDS, now
 from backend.app.services.verification import run_verification
 
 
 ROOT = Path(__file__).resolve().parents[2]
 FRONTEND = ROOT / "frontend"
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -96,6 +101,12 @@ def root():
 app.mount("/static", StaticFiles(directory=FRONTEND), name="static")
 
 
+def _event_id() -> str:
+    # append_event allocates an ID under its own SQLite transaction. Passing no ID
+    # avoids deriving an ID from a different table's count.
+    return ""
+
+
 @app.get("/api/health")
 def health():
     return {
@@ -135,16 +146,9 @@ def dashboard():
         "L2_Claims": sum(str(r.get("L2", "")).upper() == "TRUE" for r in claims),
         "L3_Claims": sum(str(r.get("L3", "")).upper() == "TRUE" for r in claims),
         "Refuted_Claims": sum(str(r.get("Refuted", "")).upper() == "TRUE" for r in claims),
-        "High_Risk_Assets": sum(
-            str(r.get("HNDL_Risk", "")).upper() in {"HIGH", "CRITICAL"} for r in assets
-        ),
-        "Critical_Risk_Assets": sum(
-            str(r.get("HNDL_Risk", "")).upper() == "CRITICAL" for r in assets
-        ),
-        "Migration_Issues": sum(
-            str(r.get("Migration_Status", "")).upper() in {"FAILED", "PARTIAL"}
-            for r in migrations
-        ),
+        "High_Risk_Assets": sum(str(r.get("HNDL_Risk", "")).upper() in {"HIGH", "CRITICAL"} for r in assets),
+        "Critical_Risk_Assets": sum(str(r.get("HNDL_Risk", "")).upper() == "CRITICAL" for r in assets),
+        "Migration_Issues": sum(str(r.get("Migration_Status", "")).upper() in {"FAILED", "PARTIAL"} for r in migrations),
         "Failed_Audits": sum(str(r.get("Result", "")).upper() == "FAIL" for r in audits),
         "Total_Experiments": count_records("13_EXPERIMENTS"),
         "Provenance_Events": len(all_events()),
@@ -157,11 +161,7 @@ def sheets():
 
 
 @app.get("/api/records/{sheet}")
-def get_records(
-    sheet: str,
-    limit: int = Query(100, ge=1, le=1000),
-    offset: int = Query(0, ge=0),
-):
+def get_records(sheet: str, limit: int = Query(100, ge=1, le=1000), offset: int = Query(0, ge=0)):
     if sheet not in SHEETS:
         raise HTTPException(400, "Unsupported sheet")
     return {"sheet": sheet, "records": list_(sheet, limit, offset)}
@@ -179,18 +179,15 @@ def get_one(sheet: str, record_id: str):
 def create_record(req: RecordRequest):
     try:
         result = create(req.sheet, req.record)
-        append_event(
-            {
-                "Event_ID": generate_id("05_PROVENANCE", count_records("05_PROVENANCE") + 1),
-                "Case_ID": result.get("Case_ID", ""),
-                "Object_Type": req.sheet,
-                "Object_ID": result.get(ID_FIELDS.get(req.sheet, ""), ""),
-                "Event_Type": "RECORD_CREATED",
-                "Actor": "Research Engine",
-                "Timestamp": now(),
-                "Payload": result,
-            }
-        )
+        append_event({
+            "Case_ID": result.get("Case_ID", ""),
+            "Object_Type": req.sheet,
+            "Object_ID": result.get(ID_FIELDS.get(req.sheet, ""), ""),
+            "Event_Type": "RECORD_CREATED",
+            "Actor": "Research Engine",
+            "Timestamp": now(),
+            "Payload": result,
+        })
         return result
     except Exception as exc:
         raise HTTPException(400, str(exc))
@@ -200,18 +197,15 @@ def create_record(req: RecordRequest):
 def update_record(req: UpdateRequest):
     try:
         result = update(req.sheet, req.id_value, req.patch)
-        append_event(
-            {
-                "Event_ID": generate_id("05_PROVENANCE", count_records("05_PROVENANCE") + 1),
-                "Case_ID": result.get("Case_ID", "") if result else "",
-                "Object_Type": req.sheet,
-                "Object_ID": req.id_value,
-                "Event_Type": "RECORD_UPDATED",
-                "Actor": "Research Engine",
-                "Timestamp": now(),
-                "Payload": req.patch,
-            }
-        )
+        append_event({
+            "Case_ID": result.get("Case_ID", "") if result else "",
+            "Object_Type": req.sheet,
+            "Object_ID": req.id_value,
+            "Event_Type": "RECORD_UPDATED",
+            "Actor": "Research Engine",
+            "Timestamp": now(),
+            "Payload": req.patch,
+        })
         return result
     except KeyError:
         raise HTTPException(404, "Record not found")
@@ -225,16 +219,13 @@ def delete_record(sheet: str, record_id: str):
         delete(sheet, record_id)
     except KeyError:
         raise HTTPException(404, "Record not found")
-    append_event(
-        {
-            "Event_ID": generate_id("05_PROVENANCE", count_records("05_PROVENANCE") + 1),
-            "Object_Type": sheet,
-            "Object_ID": record_id,
-            "Event_Type": "RECORD_DELETED",
-            "Actor": "Research Engine",
-            "Timestamp": now(),
-        }
-    )
+    append_event({
+        "Object_Type": sheet,
+        "Object_ID": record_id,
+        "Event_Type": "RECORD_DELETED",
+        "Actor": "Research Engine",
+        "Timestamp": now(),
+    })
     return {"deleted": True, "sheet": sheet, "record_id": record_id}
 
 
@@ -267,18 +258,15 @@ def claim_create(req: ClaimRequest):
         "Created_By": "ECA-PQFA Research Engine",
     }
     created = create("03_CLAIMS", derived_claim_fields(record))
-    append_event(
-        {
-            "Event_ID": generate_id("05_PROVENANCE", count_records("05_PROVENANCE") + 1),
-            "Case_ID": created["Case_ID"],
-            "Object_Type": "03_CLAIMS",
-            "Object_ID": created["Claim_ID"],
-            "Event_Type": "CLAIM_CREATED",
-            "Actor": "Research Engine",
-            "Timestamp": now(),
-            "Payload": created,
-        }
-    )
+    append_event({
+        "Case_ID": created["Case_ID"],
+        "Object_Type": "03_CLAIMS",
+        "Object_ID": created["Claim_ID"],
+        "Event_Type": "CLAIM_CREATED",
+        "Actor": "Research Engine",
+        "Timestamp": now(),
+        "Payload": created,
+    })
     return created
 
 
@@ -288,13 +276,8 @@ def hash_evidence(req: EvidenceFileRequest):
     if not path.exists() or not path.is_file():
         raise HTTPException(400, "Evidence file not found")
     data = path.read_bytes()
-    return {
-        "path": str(path),
-        "file_name": path.name,
-        "file_size": len(data),
-        "sha256": hashlib.sha256(data).hexdigest(),
-        "sha3_256": hashlib.sha3_256(data).hexdigest(),
-    }
+    return {"path": str(path), "file_name": path.name, "file_size": len(data),
+            "sha256": hashlib.sha256(data).hexdigest(), "sha3_256": hashlib.sha3_256(data).hexdigest()}
 
 
 @app.post("/api/inventory/scan")
@@ -315,30 +298,28 @@ def cbom(req: InventoryRequest):
 
 @app.post("/api/hndl/calculate")
 def calculate_hndl(req: HNDLRequest):
-    return hndl_assessment(**req.model_dump())
+    try:
+        return hndl_assessment(**req.model_dump())
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(422, f"Invalid HNDL input: {exc}")
 
 
 @app.post("/api/verification/run", dependencies=[Depends(require_api_key)])
 def verification_run(body: Dict[str, Any]):
     try:
         path = body.get("evidence_path", body.get("path", ""))
-        return run_verification(
-            body.get("claim", body),
-            str(safe_path(path)) if path else "",
-            body.get("verifier_id", "deterministic-v1"),
-        )
+        return run_verification(body.get("claim", body), str(safe_path(path)) if path else "",
+                                body.get("verifier_id", "deterministic-v1"))
     except FileNotFoundError as exc:
         raise HTTPException(400, str(exc))
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
 
 
 @app.post("/api/verification/promote", dependencies=[Depends(require_api_key)])
 def verification_promote(body: Dict[str, Any]):
-    return promotion_check(
-        body.get("claim", {}),
-        body.get("verifications", []),
-        bool(body.get("formal_proof_artifact")),
-        bool(body.get("human_review")),
-    )
+    return promotion_check(body.get("claim", {}), body.get("verifications", []),
+                           body.get("formal_proof_artifact", False), body.get("human_review", False))
 
 
 @app.get("/api/provenance/audit")
@@ -349,9 +330,7 @@ def provenance_audit():
 @app.post("/api/provenance/event", dependencies=[Depends(require_api_key)])
 def provenance_event(body: Dict[str, Any]):
     payload = dict(body)
-    payload.setdefault(
-        "Event_ID", generate_id("05_PROVENANCE", count_records("05_PROVENANCE") + 1)
-    )
+    payload.pop("Event_ID", None)
     payload.setdefault("Timestamp", now())
     return append_event(payload)
 
@@ -365,35 +344,40 @@ def provenance_tree_head():
 def provenance_inclusion(event_id: str, tree_size: int | None = None):
     try:
         return inclusion_for_event(event_id, tree_size)
-    except Exception as exc:
+    except ValueError as exc:
         raise HTTPException(400, str(exc))
 
 
 @app.get("/api/provenance/consistency")
-def provenance_consistency(
-    old_size: int = Query(..., ge=0),
-    new_size: int | None = None,
-):
+def provenance_consistency(old_size: int = Query(..., ge=0), new_size: int | None = None):
     try:
         return consistency(old_size, new_size)
-    except Exception as exc:
+    except ValueError as exc:
         raise HTTPException(400, str(exc))
 
 
 @app.get("/api/provenance/verify-inclusion")
 def verify_inclusion_endpoint(event_id: str, tree_size: int | None = None):
-    from backend.app.services.merkle import root_from_leaf_hashes, verify_inclusion
-
     try:
         proof = inclusion_for_event(event_id, tree_size)
-        hashes = event_hashes()[: proof["tree_size"]]
+        events = all_events()
+        size = proof["tree_size"]
+        hashes = event_hashes()[:size]
         root = root_from_leaf_hashes(hashes)
-        return {
-            "valid": verify_inclusion(bytes.fromhex(proof["leaf_hash"]), proof, root),
-            "proof": proof,
-            "root": root,
-        }
-    except Exception as exc:
+        valid = verify_inclusion(bytes.fromhex(proof["leaf_hash"]), proof, root)
+        return {"valid": valid, "proof": proof, "root": root}
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@app.get("/api/provenance/verify-consistency")
+def verify_consistency_endpoint(old_size: int = Query(..., ge=0), new_size: int = Query(..., ge=0)):
+    try:
+        proof = consistency(old_size, new_size)
+        valid = verify_consistency(proof["old_size"], proof["new_size"], proof["old_root"],
+                                   proof["new_root"], proof["proof"])
+        return {"valid": valid, "proof": proof}
+    except ValueError as exc:
         raise HTTPException(400, str(exc))
 
 
@@ -407,36 +391,19 @@ def graph_data():
         target = (record.get("Target_ID"), record.get("Target_Type"))
         nodes[str(source)] = {"id": source[0], "type": source[1]}
         nodes[str(target)] = {"id": target[0], "type": target[1]}
-        edges.append(
-            {
-                "source": source[0],
-                "target": target[0],
-                "relationship": record.get("Relationship"),
-                "assurance_level": record.get("Assurance_Level"),
-            }
-        )
+        edges.append({"source": source[0], "target": target[0],
+                      "relationship": record.get("Relationship"), "assurance_level": record.get("Assurance_Level")})
     return {"nodes": list(nodes.values()), "edges": edges}
 
 
 @app.post("/api/relationship", dependencies=[Depends(require_api_key)])
 def create_relationship(req: RelationshipRequest):
-    return create(
-        "10_DIGITAL_TWIN",
-        {
-            "Case_ID": req.case_id,
-            "Source_ID": req.source_id,
-            "Source_Type": req.source_type,
-            "Relationship": req.relationship,
-            "Target_ID": req.target_id,
-            "Target_Type": req.target_type,
-            "Assurance_Level": req.assurance_level,
-            "Evidence_ID": req.evidence_id,
-            "Claim_ID": req.claim_id,
-            "Created_At": now(),
-            "Status": req.status,
-            "Notes": req.notes,
-        },
-    )
+    return create("10_DIGITAL_TWIN", {
+        "Case_ID": req.case_id, "Source_ID": req.source_id, "Source_Type": req.source_type,
+        "Relationship": req.relationship, "Target_ID": req.target_id, "Target_Type": req.target_type,
+        "Assurance_Level": req.assurance_level, "Evidence_ID": req.evidence_id, "Claim_ID": req.claim_id,
+        "Created_At": now(), "Status": req.status, "Notes": req.notes,
+    })
 
 
 @app.post("/api/sheets/health", dependencies=[Depends(require_api_key)])
