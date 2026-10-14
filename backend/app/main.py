@@ -131,7 +131,7 @@ def config():
     }
 
 
-@app.get("/api/dashboard")
+@app.get("/api/dashboard", dependencies=[Depends(require_api_key)])
 def dashboard():
     claims = list_("03_CLAIMS", 10000, 0)
     assets = list_("06_ASSETS", 10000, 0)
@@ -160,14 +160,14 @@ def sheets():
     return [{"name": k, "id_field": ID_FIELDS[k], "columns": v} for k, v in SHEETS.items()]
 
 
-@app.get("/api/records/{sheet}")
+@app.get("/api/records/{sheet}", dependencies=[Depends(require_api_key)])
 def get_records(sheet: str, limit: int = Query(100, ge=1, le=1000), offset: int = Query(0, ge=0)):
     if sheet not in SHEETS:
         raise HTTPException(400, "Unsupported sheet")
     return {"sheet": sheet, "records": list_(sheet, limit, offset)}
 
 
-@app.get("/api/records/{sheet}/{record_id}")
+@app.get("/api/records/{sheet}/{record_id}", dependencies=[Depends(require_api_key)])
 def get_one(sheet: str, record_id: str):
     try:
         return get(sheet, record_id)
@@ -270,7 +270,7 @@ def claim_create(req: ClaimRequest):
     return created
 
 
-@app.post("/api/evidence/hash")
+@app.post("/api/evidence/hash", dependencies=[Depends(require_api_key)])
 def hash_evidence(req: EvidenceFileRequest):
     path = safe_path(req.path)
     if not path.exists() or not path.is_file():
@@ -280,7 +280,7 @@ def hash_evidence(req: EvidenceFileRequest):
             "sha256": hashlib.sha256(data).hexdigest(), "sha3_256": hashlib.sha3_256(data).hexdigest()}
 
 
-@app.post("/api/inventory/scan")
+@app.post("/api/inventory/scan", dependencies=[Depends(require_api_key)])
 def inventory(req: InventoryRequest):
     try:
         return scan_directory(str(safe_path(req.path)), req.recursive)
@@ -288,7 +288,7 @@ def inventory(req: InventoryRequest):
         raise HTTPException(400, str(exc))
 
 
-@app.post("/api/inventory/cbom")
+@app.post("/api/inventory/cbom", dependencies=[Depends(require_api_key)])
 def cbom(req: InventoryRequest):
     try:
         return build_cbom(str(safe_path(req.path)), req.recursive)
@@ -322,7 +322,7 @@ def verification_promote(body: Dict[str, Any]):
                            body.get("formal_proof_artifact", False), body.get("human_review", False))
 
 
-@app.get("/api/provenance/audit")
+@app.get("/api/provenance/audit", dependencies=[Depends(require_api_key)])
 def provenance_audit():
     return audit_chain()
 
@@ -340,7 +340,7 @@ def provenance_tree_head():
     return create_tree_head()
 
 
-@app.get("/api/provenance/inclusion/{event_id}")
+@app.get("/api/provenance/inclusion/{event_id}", dependencies=[Depends(require_api_key)])
 def provenance_inclusion(event_id: str, tree_size: int | None = None):
     try:
         return inclusion_for_event(event_id, tree_size)
@@ -348,7 +348,7 @@ def provenance_inclusion(event_id: str, tree_size: int | None = None):
         raise HTTPException(400, str(exc))
 
 
-@app.get("/api/provenance/consistency")
+@app.get("/api/provenance/consistency", dependencies=[Depends(require_api_key)])
 def provenance_consistency(old_size: int = Query(..., ge=0), new_size: int | None = None):
     try:
         return consistency(old_size, new_size)
@@ -356,7 +356,7 @@ def provenance_consistency(old_size: int = Query(..., ge=0), new_size: int | Non
         raise HTTPException(400, str(exc))
 
 
-@app.get("/api/provenance/verify-inclusion")
+@app.get("/api/provenance/verify-inclusion", dependencies=[Depends(require_api_key)])
 def verify_inclusion_endpoint(event_id: str, tree_size: int | None = None):
     try:
         proof = inclusion_for_event(event_id, tree_size)
@@ -370,7 +370,7 @@ def verify_inclusion_endpoint(event_id: str, tree_size: int | None = None):
         raise HTTPException(400, str(exc))
 
 
-@app.get("/api/provenance/verify-consistency")
+@app.get("/api/provenance/verify-consistency", dependencies=[Depends(require_api_key)])
 def verify_consistency_endpoint(old_size: int = Query(..., ge=0), new_size: int = Query(..., ge=0)):
     try:
         proof = consistency(old_size, new_size)
@@ -381,7 +381,7 @@ def verify_consistency_endpoint(old_size: int = Query(..., ge=0), new_size: int 
         raise HTTPException(400, str(exc))
 
 
-@app.get("/api/graph")
+@app.get("/api/graph", dependencies=[Depends(require_api_key)])
 def graph_data():
     records = list_("10_DIGITAL_TWIN", 10000, 0)
     nodes: Dict[str, Dict[str, Any]] = {}
