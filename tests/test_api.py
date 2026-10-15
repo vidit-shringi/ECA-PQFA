@@ -50,7 +50,7 @@ def test_scope_inflation_is_rejected():
         assert response.status_code == 200
         body = response.json()
         assert body["valid"] is False
-        assert body["scope_status"] == "VERIFIED_SCOPE_NARROWER"
+        assert body["scope_status"] == "SCOPE_INFLATION"
 
 
 def test_config_does_not_expose_integration_identifier():
