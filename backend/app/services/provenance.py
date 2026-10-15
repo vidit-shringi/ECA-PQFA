@@ -133,8 +133,14 @@ def audit_chain() -> Dict[str, Any]:
     pq_signature_valid = None
     if head:
         signature_valid = verify_classical(head["signed_payload"].encode(), head["classical_signature"], head["classical_public_key"])
+        if not signature_valid:
+            valid = False
+            reasons.append("classical tree-head signature verification failed")
         if head.get("pq_signature") and head.get("pq_public_key"):
             pq_signature_valid = verify_mldsa(head["signed_payload"].encode(), head["pq_signature"], head["pq_public_key"])
+            if not pq_signature_valid:
+                valid = False
+                reasons.append("post-quantum tree-head signature verification failed")
         size = int(head["tree_size"])
         if size > len(hashes) or size < 0:
             valid = False
