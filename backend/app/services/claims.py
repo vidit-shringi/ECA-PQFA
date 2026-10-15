@@ -2,15 +2,16 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
+# Scope breadth: A=design, B=reduced-parameter, C=implementation, D=protocol.
+# Larger values represent broader claims.
 SCOPE_ORDER = {"D": 1, "C": 2, "B": 3, "A": 4}
-CLAIM_FORMS = {"EX","ST","CX","PD","IM","PR","NG","ID"}
-ORIGINS = {"AI","HUMAN","HYBRID","SYSTEM"}
+CLAIM_FORMS = {"EX", "ST", "CX", "PD", "IM", "PR", "NG", "ID"}
+ORIGINS = {"AI", "HUMAN", "HYBRID", "SYSTEM"}
 
 
 def scope_status(claimed: str, verified: str) -> str:
     claimed = (claimed or "").strip().upper()
     verified = (verified or "").strip().upper()
-
     if not claimed:
         return "MISSING_CLAIMED_SCOPE"
     if not verified or verified == "NOT_VERIFIED":
@@ -19,14 +20,14 @@ def scope_status(claimed: str, verified: str) -> str:
         return "INVALID_SCOPE"
     if claimed == verified:
         return "SCOPE_MATCH"
-    if SCOPE_ORDER[verified] < SCOPE_ORDER[claimed]:
-        return "VERIFIED_SCOPE_NARROWER"
-    return "SCOPE_INFLATION"
+    # Inflation means the claim asserts a broader scope than the evidence verifies.
+    if SCOPE_ORDER[claimed] > SCOPE_ORDER[verified]:
+        return "SCOPE_INFLATION"
+    return "VERIFIED_SCOPE_BROADER"
 
 
 def validate_claim(c: Dict[str, Any]) -> Dict[str, Any]:
     issues: List[str] = []
-
     required = {
         "case_id": "Case_ID",
         "claim_statement": "Claim_Statement",
@@ -53,10 +54,9 @@ def validate_claim(c: Dict[str, Any]) -> Dict[str, Any]:
 
     ss = scope_status(claimed, verified)
     if ss == "SCOPE_INFLATION":
-        issues.append("Scope mismatch detected: the verified scope is broader than the claimed scope.")
-    elif ss == "VERIFIED_SCOPE_NARROWER":
         issues.append("Scope inflation detected: the claimed scope is broader than the verified scope.")
-
+    elif ss == "VERIFIED_SCOPE_BROADER":
+        issues.append("Scope mismatch: the evidence verifies a broader scope than the claim states; review the scope mapping.")
     return {"valid": not issues, "issues": issues, "scope_status": ss}
 
 
@@ -65,12 +65,15 @@ def derived_claim_fields(c: Dict[str, Any]) -> Dict[str, Any]:
     claimed = str(r.get("Claimed_Scope", "")).upper()
     verified = str(r.get("Verified_Scope", "NOT_VERIFIED")).upper()
     r["Scope_Status"] = scope_status(claimed, verified)
-
+    # Assurance flags are derived conservatively; a caller-supplied L3 must never
+    # silently override the absence of verified proof evidence.
     l3 = str(r.get("L3", "FALSE")).upper() == "TRUE"
     l2 = str(r.get("L2", "FALSE")).upper() == "TRUE"
     l1 = str(r.get("L1", "FALSE")).upper() == "TRUE"
     l0 = str(r.get("L0", "FALSE")).upper() == "TRUE"
     r["Assurance_State"] = "L3" if l3 else "L2" if l2 else "L1" if l1 else "L0"
-    if str(r.get("Origin", "")).upper() == "AI" and r["Assurance_State"] in {"L1","L2","L3"}:
-        r["Notes"] = (str(r.get("Notes","")) + " AI output alone does not establish assurance; backend evidence/verification required.").strip()
+    if not any((l0, l1, l2, l3)):
+        r["L0"] = "TRUE"
+    if str(r.get("Origin", "")).upper() == "AI" and r["Assurance_State"] in {"L1", "L2", "L3"}:
+        r["Notes"] = (str(r.get("Notes", "")) + " AI output alone does not establish assurance; backend evidence/verification required.").strip()
     return r
