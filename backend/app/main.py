@@ -183,7 +183,7 @@ def create_record(req: RecordRequest):
         if req.sheet == "03_CLAIMS":
             validation = validate_claim(req.record)
             if not validation["valid"]:
-                raise HTTPException(400, validation)
+                raise ValueError("Invalid claim: " + "; ".join(validation["issues"]))
             result = create(req.sheet, derived_claim_fields(req.record))
         else:
             result = create(req.sheet, req.record)
