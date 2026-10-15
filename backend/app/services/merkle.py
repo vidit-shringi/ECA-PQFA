@@ -108,7 +108,16 @@ def _verify_leaf_hash(leaf: bytes, proof: Dict[str, Any], expected_root: str) ->
 
 
 def verify_inclusion(leaf: bytes | str, proof: Dict[str, Any], expected_root: str) -> bool:
-    """Verify a raw leaf value, applying the domain-separated leaf hash."""
+    """Verify a raw leaf, or a pre-hashed leaf when it exactly matches proof.leaf_hash."""
+    if isinstance(leaf, bytes) and len(leaf) == 32 and proof.get("leaf_hash") == leaf.hex():
+        return _verify_leaf_hash(leaf, proof, expected_root)
+    if isinstance(leaf, str):
+        try:
+            raw = bytes.fromhex(leaf)
+            if len(raw) == 32 and proof.get("leaf_hash") == raw.hex():
+                return _verify_leaf_hash(raw, proof, expected_root)
+        except ValueError:
+            pass
     return _verify_leaf_hash(leaf_hash(leaf), proof, expected_root)
 
 
