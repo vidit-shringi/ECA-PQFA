@@ -315,7 +315,10 @@ def cbom(req: InventoryRequest):
 
 @app.post("/api/hndl/calculate")
 def calculate_hndl(req: HNDLRequest):
-    return hndl_assessment(**req.model_dump())
+    try:
+        return hndl_assessment(**req.model_dump())
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(400, str(exc))
 
 
 @app.post("/api/verification/run", dependencies=[Depends(require_api_key)])
