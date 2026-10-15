@@ -33,6 +33,21 @@ def create(sheet: str, record: Dict[str, Any]) -> Dict[str, Any]:
 def update(sheet: str, record_id: str, patch: Dict[str, Any]) -> Dict[str, Any]:
     if sheet not in SHEETS:
         raise ValueError(f"Unsupported sheet: {sheet}")
+    if sheet == "03_CLAIMS":
+        protected = {"L0", "L1", "L2", "L3", "Assurance_State", "Scope_Status", "Refuted"}
+        blocked = sorted(protected.intersection(patch))
+        if blocked:
+            raise ValueError("Claim assurance/refutation fields are server-controlled: " + ", ".join(blocked))
+        current = get_record(sheet, record_id)
+        if current is None:
+            raise KeyError(record_id)
+        merged = dict(current)
+        merged.update(patch)
+        from backend.app.services.claims import derived_claim_fields, validate_claim
+        validation = validate_claim(merged)
+        if not validation["valid"]:
+            raise ValueError("Invalid claim update: " + "; ".join(validation["issues"]))
+        patch = derived_claim_fields(merged)
     updated = update_record(sheet, record_id, patch)
     if updated is None:
         raise KeyError(record_id)
