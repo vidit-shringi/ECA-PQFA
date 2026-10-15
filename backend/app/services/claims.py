@@ -65,15 +65,14 @@ def derived_claim_fields(c: Dict[str, Any]) -> Dict[str, Any]:
     claimed = str(r.get("Claimed_Scope", "")).upper()
     verified = str(r.get("Verified_Scope", "NOT_VERIFIED")).upper()
     r["Scope_Status"] = scope_status(claimed, verified)
-    # Assurance flags are derived conservatively; a caller-supplied L3 must never
-    # silently override the absence of verified proof evidence.
-    l3 = str(r.get("L3", "FALSE")).upper() == "TRUE"
-    l2 = str(r.get("L2", "FALSE")).upper() == "TRUE"
-    l1 = str(r.get("L1", "FALSE")).upper() == "TRUE"
-    l0 = str(r.get("L0", "FALSE")).upper() == "TRUE"
-    r["Assurance_State"] = "L3" if l3 else "L2" if l2 else "L1" if l1 else "L0"
-    if not any((l0, l1, l2, l3)):
-        r["L0"] = "TRUE"
+    # A newly registered claim is only a hypothesis (L0). Never accept
+    # caller-supplied assurance/refutation flags as evidence.
+    r["L0"] = "TRUE"
+    r["L1"] = "FALSE"
+    r["L2"] = "FALSE"
+    r["L3"] = "FALSE"
+    r["Refuted"] = "FALSE"
+    r["Assurance_State"] = "L0"
     if str(r.get("Origin", "")).upper() == "AI" and r["Assurance_State"] in {"L1", "L2", "L3"}:
         r["Notes"] = (str(r.get("Notes", "")) + " AI output alone does not establish assurance; backend evidence/verification required.").strip()
     return r
