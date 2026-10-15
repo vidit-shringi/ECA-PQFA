@@ -8,10 +8,10 @@ def test_independence():
 
 
 def test_promotion_requires_evidence_backed_verifications():
-    claim = {"Claim_Form": "ID"}
+    claim = {"Claim_Form": "EX"}
     vs = [
-        {"Result": "PASS", "verifier_implementation": "a", "verification_artifact_hash": "a" * 64},
-        {"Result": "PASS", "verifier_implementation": "b", "verification_artifact_hash": "b" * 64},
+        {"Result": "PASS", "verification_artifact_hash": "a" * 64, "verifier_implementation": "a", "hardware": "x"},
+        {"Result": "PASS", "verification_artifact_hash": "b" * 64, "verifier_implementation": "b", "hardware": "y"},
     ]
     result = promotion_check(claim, vs)
     assert result["L1"]
@@ -34,7 +34,7 @@ def test_l2_requires_required_dimensions_to_be_present():
     result = promotion_check(
         {"Claim_Form": "EX"},
         [
-            {"Result": "PASS", "verification_artifact_hash": "a" * 64, "verifier_implementation": "a"},
+            {"Result": "PASS", "verification_artifact_hash": "a" * 64, "verifier_implementation": "a", "hardware": "x"},
             {"Result": "PASS", "verification_artifact_hash": "b" * 64, "verifier_implementation": "b"},
         ],
     )
