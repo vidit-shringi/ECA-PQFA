@@ -10,11 +10,15 @@
 <body>
 <header class="topbar">
   <div>
-    <div class="eyebrow">RESEARCH TOOL / v3.2.0</div>
+    <div class="eyebrow" id="version">RESEARCH TOOL</div>
     <h1>ECA-PQFA</h1>
     <p>Evidence-Carrying AI-Assisted Cryptanalysis and Post-Quantum Forensic Assurance</p>
   </div>
-  <div class="status-card"><span id="status-dot" class="dot"></span><span id="status-text">Checking service…</span></div>
+  <div class="status-card">
+    <input id="api-key" type="password" placeholder="API key (if required)" autocomplete="off" aria-label="API key">
+    <button class="button" id="save-key" type="button">Use</button>
+    <span id="status-dot" class="dot"></span><span id="status-text">Checking service…</span>
+  </div>
 </header>
 
 <main class="shell">
