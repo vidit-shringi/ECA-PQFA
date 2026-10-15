@@ -48,7 +48,9 @@ from backend.app.services.verification import run_verification
 
 
 ROOT = Path(__file__).resolve().parents[2]
-FRONTEND = ROOT / "frontend"
+SOURCE_FRONTEND = ROOT / "frontend"
+PACKAGED_FRONTEND = Path(__file__).resolve().parent / "static"
+FRONTEND = SOURCE_FRONTEND if SOURCE_FRONTEND.is_dir() else PACKAGED_FRONTEND
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
