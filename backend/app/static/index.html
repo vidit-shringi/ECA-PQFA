@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="ECA-PQFA research console">
+<title>ECA-PQFA Research Console</title>
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div>
+    <div class="eyebrow">RESEARCH TOOL / v3.2.0</div>
+    <h1>ECA-PQFA</h1>
+    <p>Evidence-Carrying AI-Assisted Cryptanalysis and Post-Quantum Forensic Assurance</p>
+  </div>
+  <div class="status-card"><span id="status-dot" class="dot"></span><span id="status-text">Checking service…</span></div>
+</header>
+
+<main class="shell">
+<section class="hero panel">
+  <div>
+    <h2>Evidence first. Scope explicit. Verification reproducible.</h2>
+    <p>Inspect the local research engine, validate claims, hash controlled evidence, scan cryptographic assets, generate CBOM output, and inspect provenance integrity.</p>
+  </div>
+  <div class="hero-actions"><a class="button primary" href="/docs">Open API</a><button class="button" id="refresh">Refresh</button></div>
+</section>
+
+<section class="metrics">
+  <article class="metric panel"><span>Cases</span><strong id="m-cases">—</strong></article>
+  <article class="metric panel"><span>Evidence</span><strong id="m-evidence">—</strong></article>
+  <article class="metric panel"><span>Claims</span><strong id="m-claims">—</strong></article>
+  <article class="metric panel"><span>Experiments</span><strong id="m-experiments">—</strong></article>
+  <article class="metric panel"><span>Provenance Events</span><strong id="m-events">—</strong></article>
+  <article class="metric panel"><span>Failed Audits</span><strong id="m-failed">—</strong></article>
+</section>
+
+<section class="grid-2">
+<article class="panel">
+  <div class="panel-title"><div><div class="eyebrow">CLAIM VALIDATION</div><h3>Check scope semantics</h3></div></div>
+  <form id="claim-form">
+    <label>Claim form
+      <select name="claim_form"><option>ID</option><option>EX</option><option>ST</option><option>CX</option><option>PD</option><option>IM</option><option>PR</option><option>NG</option></select>
+    </label>
+    <label>Case ID<input name="case_id" value="CASE-2026-0001" required></label>
+    <label>Claim statement<textarea name="claim_statement" required>The controlled synthetic artifact contains the declared algorithm.</textarea></label>
+    <div class="row">
+      <label>Claimed scope<select name="claimed_scope"><option>A</option><option>B</option><option>C</option><option>D</option></select></label>
+      <label>Verified scope<select name="verified_scope"><option>NOT_VERIFIED</option><option>A</option><option>B</option><option>C</option><option>D</option></select></label>
+    </div>
+    <label>Origin<select name="origin"><option>HUMAN</option><option>AI</option><option>HYBRID</option><option>SYSTEM</option></select></label>
+    <button class="button primary" type="submit">Validate claim</button>
+  </form>
+  <pre id="claim-output" class="output">Waiting for input…</pre>
+</article>
+
+<article class="panel">
+  <div class="panel-title"><div><div class="eyebrow">CRYPTO INVENTORY</div><h3>Scan a controlled directory</h3></div></div>
+  <form id="inventory-form">
+    <label>Directory<input name="path" value="data/synthetic" required></label>
+    <label class="check"><input type="checkbox" name="recursive" checked> Recursive scan</label>
+    <div class="row"><button class="button primary" type="submit">Scan inventory</button><button class="button" type="button" id="cbom">Generate CBOM</button></div>
+  </form>
+  <pre id="inventory-output" class="output">No scan yet.</pre>
+</article>
+</section>
+
+<section class="grid-2">
+<article class="panel">
+  <div class="panel-title"><div><div class="eyebrow">INTEGRITY</div><h3>Provenance audit</h3></div></div>
+  <button class="button primary" id="audit">Run provenance audit</button>
+  <pre id="audit-output" class="output">No audit yet.</pre>
+</article>
+<article class="panel">
+  <div class="panel-title"><div><div class="eyebrow">CAPABILITIES</div><h3>Research engine status</h3></div></div>
+  <div class="cap-grid">
+    <span>Claims L0–L3</span><span>Merkle provenance</span><span>Ed25519</span><span>Optional ML-DSA-65</span>
+    <span>Inventory / CBOM</span><span>HNDL</span><span>Migration evidence</span><span>Google Sheets bridge</span>
+  </div>
+</article>
+</section>
+</main>
+
+<footer class="footer">ECA-PQFA is a university research tool/reference implementation. PASS results are scoped verification results, not security proofs.</footer>
+<script src="/static/app.js"></script>
+</body>
+</html>
