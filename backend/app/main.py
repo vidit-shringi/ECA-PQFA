@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import secrets
 import json
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -48,7 +49,9 @@ from backend.app.services.verification import run_verification
 
 
 ROOT = Path(__file__).resolve().parents[2]
-FRONTEND = ROOT / "frontend"
+SOURCE_FRONTEND = ROOT / "frontend"
+PACKAGED_FRONTEND = Path(__file__).resolve().parent / "static"
+FRONTEND = SOURCE_FRONTEND if SOURCE_FRONTEND.is_dir() else PACKAGED_FRONTEND
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -73,6 +76,28 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PATCH", "DELETE"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def api_key_guard(request, call_next):
+    """Protect all data APIs in shared deployments, including read endpoints.
+    Health and non-sensitive configuration remain available for health checks/UI bootstrap.
+    """
+    path = request.url.path
+    public_paths = {"/api/health", "/api/config"}
+    if settings.require_api_key and path.startswith("/api/") and path not in public_paths:
+        supplied = request.headers.get("x-eca-api-key", "")
+        configured = settings.api_key or ""
+        if not configured or not supplied or not secrets.compare_digest(
+            supplied.encode("utf-8"), configured.encode("utf-8")
+        ):
+            from fastapi.responses import JSONResponse
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Invalid or missing API key"},
+                headers={"Cache-Control": "no-store"},
+            )
+    return await call_next(request)
 
 
 @app.middleware("http")
@@ -178,7 +203,13 @@ def get_one(sheet: str, record_id: str):
 @app.post("/api/records", dependencies=[Depends(require_api_key)])
 def create_record(req: RecordRequest):
     try:
-        result = create(req.sheet, req.record)
+        if req.sheet == "03_CLAIMS":
+            validation = validate_claim(req.record)
+            if not validation["valid"]:
+                raise ValueError("Invalid claim: " + "; ".join(validation["issues"]))
+            result = create(req.sheet, derived_claim_fields(req.record))
+        else:
+            result = create(req.sheet, req.record)
         append_event(
             {
                 "Event_ID": generate_id("05_PROVENANCE", count_records("05_PROVENANCE") + 1),
@@ -315,7 +346,10 @@ def cbom(req: InventoryRequest):
 
 @app.post("/api/hndl/calculate")
 def calculate_hndl(req: HNDLRequest):
-    return hndl_assessment(**req.model_dump())
+    try:
+        return hndl_assessment(**req.model_dump())
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(400, str(exc))
 
 
 @app.post("/api/verification/run", dependencies=[Depends(require_api_key)])

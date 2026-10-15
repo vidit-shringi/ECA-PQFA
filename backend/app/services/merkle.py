@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import hashlib
-from typing import Any, Dict, List, Sequence, Tuple
+from typing import Any, Dict, List, Sequence
 
 
 def _sha(data: bytes) -> bytes:
@@ -31,8 +31,7 @@ def _mth(items: Sequence[bytes]) -> bytes:
 
 
 def root_from_bytes(items: Sequence[bytes | str]) -> str:
-    leaves = [leaf_hash(x) for x in items]
-    return _mth(leaves).hex()
+    return _mth([leaf_hash(x) for x in items]).hex()
 
 
 def root_from_leaf_hashes(hashes: Sequence[str]) -> str:
@@ -42,8 +41,7 @@ def root_from_leaf_hashes(hashes: Sequence[str]) -> str:
 def inclusion_proof(items: Sequence[bytes | str], index: int) -> Dict[str, Any]:
     if not 0 <= index < len(items):
         raise IndexError("leaf index out of range")
-    leaves = [leaf_hash(x) for x in items]
-    return inclusion_proof_from_hashes(leaves, index)
+    return inclusion_proof_from_hashes([leaf_hash(x) for x in items], index)
 
 
 def inclusion_proof_from_hashes(leaves: Sequence[bytes], index: int) -> Dict[str, Any]:
@@ -67,40 +65,79 @@ def inclusion_proof_from_hashes(leaves: Sequence[bytes], index: int) -> Dict[str
         return walk(xs[k:], idx - k)
 
     walk(leaves, index)
-    root = _mth(leaves).hex()
-    return {"leaf_index": index, "tree_size": len(leaves), "leaf_hash": leaves[index].hex(), "audit_path": list(reversed(path)), "root": root}
+    return {
+        "leaf_index": index,
+        "tree_size": len(leaves),
+        "leaf_hash": leaves[index].hex(),
+        "audit_path": list(reversed(path)),
+        "root": _mth(leaves).hex(),
+    }
+
+
+def _verify_leaf_hash(leaf: bytes, proof: Dict[str, Any], expected_root: str) -> bool:
+    if len(leaf) != 32:
+        return False
+    try:
+        fn = int(proof.get("leaf_index", -1))
+        sn = int(proof.get("tree_size", 0)) - 1
+        if fn < 0 or sn < fn:
+            return False
+        path = [
+            bytes.fromhex(x["hash"]) if isinstance(x, dict) else bytes.fromhex(x)
+            for x in proof.get("audit_path", [])
+        ]
+        if any(len(p) != 32 for p in path):
+            return False
+        h = leaf
+        for sibling in path:
+            if sn == 0:
+                return False
+            if (fn & 1) or fn == sn:
+                h = node_hash(sibling, h)
+                if not (fn & 1):
+                    while fn and not (fn & 1):
+                        fn >>= 1
+                        sn >>= 1
+            else:
+                h = node_hash(h, sibling)
+            fn >>= 1
+            sn >>= 1
+        return sn == 0 and h.hex() == expected_root.lower()
+    except (ValueError, TypeError, KeyError):
+        return False
 
 
 def verify_inclusion(leaf: bytes | str, proof: Dict[str, Any], expected_root: str) -> bool:
-    # RFC 9162-style verification using the supplied tree index/size.
-    h = leaf_hash(leaf)
-    fn = int(proof.get("leaf_index", -1)); sn = int(proof.get("tree_size", 0)) - 1
-    if fn < 0 or sn < fn:
+    """Verify a raw leaf, or a pre-hashed leaf when it exactly matches proof.leaf_hash."""
+    if isinstance(leaf, bytes) and len(leaf) == 32 and proof.get("leaf_hash") == leaf.hex():
+        return _verify_leaf_hash(leaf, proof, expected_root)
+    if isinstance(leaf, str):
+        try:
+            raw = bytes.fromhex(leaf)
+            if len(raw) == 32 and proof.get("leaf_hash") == raw.hex():
+                return _verify_leaf_hash(raw, proof, expected_root)
+        except ValueError:
+            pass
+    return _verify_leaf_hash(leaf_hash(leaf), proof, expected_root)
+
+
+def verify_inclusion_from_hash(leaf_hash_hex: bytes | str, proof: Dict[str, Any], expected_root: str) -> bool:
+    """Verify a proof whose tree leaves are already-computed 32-byte hashes."""
+    try:
+        raw = bytes.fromhex(leaf_hash_hex) if isinstance(leaf_hash_hex, str) else leaf_hash_hex
+    except ValueError:
         return False
-    path = [bytes.fromhex(x["hash"]) if isinstance(x, dict) else bytes.fromhex(x) for x in proof.get("audit_path", [])]
-    for p in path:
-        if sn == 0:
-            return False
-        if (fn & 1) or fn == sn:
-            h = node_hash(p, h)
-            if not (fn & 1):
-                while fn and not (fn & 1):
-                    fn >>= 1; sn >>= 1
-        else:
-            h = node_hash(h, p)
-        fn >>= 1; sn >>= 1
-    return sn == 0 and h.hex() == expected_root.lower()
+    return _verify_leaf_hash(raw, proof, expected_root)
 
 
 def _largest_power_less_than(n: int) -> int:
     if n <= 1:
         return 0
-    return 1 << (n.bit_length() - 1) if (1 << (n.bit_length() - 1)) < n else 1 << (n.bit_length() - 2)
+    power = 1 << (n.bit_length() - 1)
+    return power if power < n else power >> 1
 
 
 def _consistency_proof(m: int, n: int, leaves: Sequence[bytes], complete: bool) -> List[bytes]:
-    # RFC 6962-style recursive consistency proof. The proof is represented as
-    # subtree hashes, while the verifier reconstructs both roots from the prefix.
     if m == n:
         return [] if complete else [_mth(leaves[:n])]
     k = _largest_power_less_than(n)
@@ -129,23 +166,42 @@ def consistency_proof(items: Sequence[bytes | str], old_size: int) -> Dict[str, 
 
 
 def verify_consistency(old_size: int, new_size: int, old_root: str, new_root: str, proof_hex: Sequence[str]) -> bool:
-    # RFC 9162 Section 2.1.4.2 verifier.
-    if old_size <= 0 or old_size >= new_size or not proof_hex:
-        return old_size == new_size and old_root.lower() == new_root.lower() and not proof_hex
-    path=[bytes.fromhex(x) for x in proof_hex]
-    if old_size & (old_size-1) == 0:
-        path=[bytes.fromhex(old_root)]+path
-    fn=old_size-1; sn=new_size-1
-    while fn & 1:
-        fn >>= 1; sn >>= 1
-    fr=path[0]; sr=path[0]
-    for c in path[1:]:
-        if sn==0: return False
-        if (fn & 1) or fn==sn:
-            fr=node_hash(c,fr); sr=node_hash(c,sr)
-            if not (fn & 1):
-                while fn and not (fn & 1): fn >>= 1; sn >>= 1
-        else:
-            sr=node_hash(sr,c)
-        fn >>= 1; sn >>= 1
-    return sn==0 and fr.hex()==old_root.lower() and sr.hex()==new_root.lower()
+    if old_size < 0 or new_size < old_size:
+        return False
+    empty_root = _sha(b"").hex()
+    if old_size == 0:
+        return old_root.lower() == empty_root and bool(new_root) and not proof_hex
+    if old_size == new_size:
+        return old_root.lower() == new_root.lower() and not proof_hex
+    if old_size > new_size or not proof_hex:
+        return False
+    try:
+        path = [bytes.fromhex(x) for x in proof_hex]
+        if any(len(item) != 32 for item in path):
+            return False
+        if old_size & (old_size - 1) == 0:
+            path = [bytes.fromhex(old_root)] + path
+        fn = old_size - 1
+        sn = new_size - 1
+        while fn & 1:
+            fn >>= 1
+            sn >>= 1
+        fr = path[0]
+        sr = path[0]
+        for c in path[1:]:
+            if sn == 0:
+                return False
+            if (fn & 1) or fn == sn:
+                fr = node_hash(c, fr)
+                sr = node_hash(c, sr)
+                if not (fn & 1):
+                    while fn and not (fn & 1):
+                        fn >>= 1
+                        sn >>= 1
+            else:
+                sr = node_hash(sr, c)
+            fn >>= 1
+            sn >>= 1
+        return sn == 0 and fr.hex() == old_root.lower() and sr.hex() == new_root.lower()
+    except (ValueError, IndexError):
+        return False

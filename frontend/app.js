@@ -1,4 +1,11 @@
+function apiKey() {
+  try { return sessionStorage.getItem("eca-api-key") || ""; }
+  catch (_) { return ""; }
+}
+
 async function request(path, options = {}) {
+  const key = apiKey();
+  if (key) options.headers = Object.assign({}, options.headers, { "X-ECA-API-Key": key });
   const response = await fetch(path, options);
   const data = await response.json().catch(function () { return { error: response.statusText }; });
   if (!response.ok) throw new Error(typeof data === "string" ? data : JSON.stringify(data, null, 2));
@@ -6,11 +13,22 @@ async function request(path, options = {}) {
 }
 
 function $(id) { return document.getElementById(id); }
+
+if ($("api-key") && $("save-key")) {
+  $("api-key").value = apiKey();
+  $("save-key").addEventListener("click", function () {
+    try { sessionStorage.setItem("eca-api-key", $("api-key").value.trim()); } catch (_) {}
+    loadDashboard().catch(function (error) {
+      $("status-text").textContent = /401|API key/i.test(String(error.message)) ? "API key rejected" : "Service unavailable";
+    });
+  });
+}
 function pretty(target, data) { target.textContent = JSON.stringify(data, null, 2); }
 
 async function loadDashboard() {
   const results = await Promise.all([request("/api/health"), request("/api/dashboard")]);
   const health = results[0];
+  if ($("version")) $("version").textContent = "RESEARCH TOOL / v" + health.version;
   const dashboard = results[1];
   $("status-text").textContent = health.ok ? ("Online · " + health.version) : "Unavailable";
   $("status-dot").classList.toggle("ok", Boolean(health.ok));
@@ -56,7 +74,7 @@ $("audit").addEventListener("click", async function () {
 
 $("refresh").addEventListener("click", function () {
   loadDashboard().catch(function (error) {
-    $("status-text").textContent = "Service check failed";
+    $("status-text").textContent = /401|API key/i.test(String(error.message)) ? "API key required" : "Service check failed";
     $("status-dot").classList.remove("ok");
     console.error(error);
   });
