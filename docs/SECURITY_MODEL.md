@@ -37,3 +37,11 @@ The research tool records both signatures and requires both verification checks 
 ## Google Sheets
 
 Google Sheets is a persistence/synchronisation layer. It is not the authoritative cryptographic log. Provenance integrity is computed by the Python engine.
+
+## Assurance boundary and deployment notes
+
+- L3 promotion is intentionally disabled until a trusted server-side formal-proof checker and auditable reviewer workflow are integrated. Client-supplied booleans, strings, or filenames are not proof verification.
+- The deterministic CX/PD branches return INCONCLUSIVE until claim-form-specific verifiers exist. Evidence-file presence is not a proof.
+- The HNDL calculator emits an uncalibrated scenario score. It is not a probability or an operational migration decision without calibrated inputs.
+- The container enables API-key enforcement for protected mutation routes. Supply `ECA_PQFA_API_KEY` through the runtime secret manager; never bake it into the image. The current design still requires a deployment review of read endpoints and frontend authentication before public hosting.
+- A signed tree head verified against a public key stored alongside the signature is not an external trust anchor. Pin or externally publish trusted keys/tree heads.
