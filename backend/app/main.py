@@ -180,7 +180,13 @@ def get_one(sheet: str, record_id: str):
 @app.post("/api/records", dependencies=[Depends(require_api_key)])
 def create_record(req: RecordRequest):
     try:
-        result = create(req.sheet, req.record)
+        if req.sheet == "03_CLAIMS":
+            validation = validate_claim(req.record)
+            if not validation["valid"]:
+                raise HTTPException(400, validation)
+            result = create(req.sheet, derived_claim_fields(req.record))
+        else:
+            result = create(req.sheet, req.record)
         append_event(
             {
                 "Event_ID": generate_id("05_PROVENANCE", count_records("05_PROVENANCE") + 1),
