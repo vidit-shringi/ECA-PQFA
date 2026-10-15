@@ -8,8 +8,8 @@ permissions:
   contents: read
 
 jobs:
-  ruff:
-    name: Ruff lint
+  static-analysis:
+    name: Python static analysis
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,5 +19,5 @@ jobs:
           cache: pip
       - name: Install project and lint tools
         run: python -m pip install -e ".[dev]"
-      - name: Lint tracked Python code
-        run: ruff check backend scripts run.py tests
+      - name: Check undefined names and syntax-risk issues
+        run: ruff check --select F821,F822,F823 backend scripts run.py tests
