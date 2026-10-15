@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import secrets
 import json
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -75,6 +76,28 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PATCH", "DELETE"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def api_key_guard(request, call_next):
+    """Protect all data APIs in shared deployments, including read endpoints.
+    Health and non-sensitive configuration remain available for health checks/UI bootstrap.
+    """
+    path = request.url.path
+    public_paths = {"/api/health", "/api/config"}
+    if settings.require_api_key and path.startswith("/api/") and path not in public_paths:
+        supplied = request.headers.get("x-eca-api-key", "")
+        configured = settings.api_key or ""
+        if not configured or not supplied or not secrets.compare_digest(
+            supplied.encode("utf-8"), configured.encode("utf-8")
+        ):
+            from fastapi.responses import JSONResponse
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Invalid or missing API key"},
+                headers={"Cache-Control": "no-store"},
+            )
+    return await call_next(request)
 
 
 @app.middleware("http")
