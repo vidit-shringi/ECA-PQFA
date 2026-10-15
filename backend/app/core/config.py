@@ -7,10 +7,16 @@ from pydantic import BaseModel
 
 
 ROOT = Path(__file__).resolve().parents[3]
-DB_PATH = Path(os.getenv("ECA_PQFA_DB_PATH", str(ROOT / "data" / "eca_pqfa.sqlite3"))).resolve()
+# Source checkout: keep data under the repository as before. Installed wheel:
+# store mutable state in a user-writable directory, never site-packages.
+DEFAULT_DATA_ROOT = (
+    ROOT / "data" if (ROOT / "pyproject.toml").is_file()
+    else Path(os.getenv("ECA_PQFA_DATA_DIR", str(Path.home() / ".eca-pqfa"))).expanduser().resolve()
+)
+DB_PATH = Path(os.getenv("ECA_PQFA_DB_PATH", str(DEFAULT_DATA_ROOT / "eca_pqfa.sqlite3"))).resolve()
 EVIDENCE_ROOT = Path(
-    os.getenv("ECA_PQFA_EVIDENCE_ROOT", str(ROOT / "data" / "evidence"))
-).resolve()
+    os.getenv("ECA_PQFA_EVIDENCE_ROOT", str(DEFAULT_DATA_ROOT / "evidence"))
+).expanduser().resolve()
 
 
 class Settings(BaseModel):
@@ -26,7 +32,7 @@ class Settings(BaseModel):
         "http://127.0.0.1:8000,http://localhost:8000",
     )
     require_api_key: bool = os.getenv("ECA_PQFA_REQUIRE_API_KEY", "false").lower() == "true"
-    allowed_path_roots: str = os.getenv("ECA_PQFA_ALLOWED_PATH_ROOTS", str(ROOT))
+    allowed_path_roots: str = os.getenv("ECA_PQFA_ALLOWED_PATH_ROOTS", str(DEFAULT_DATA_ROOT))
 
 
 settings = Settings()
