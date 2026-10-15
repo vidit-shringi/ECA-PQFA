@@ -1,7 +1,7 @@
 const CONFIG = {
   SPREADSHEET_ID: PropertiesService.getScriptProperties().getProperty('ECA_PQFA_SPREADSHEET_ID') || '',
   TZ: Session.getScriptTimeZone() || 'Asia/Kolkata',
-  VERSION: '3.1.0'
+  VERSION: '3.2.0'
 };
 const API_KEY_PROP = 'ECA_PQFA_API_KEY';
 const SHEETS = {
