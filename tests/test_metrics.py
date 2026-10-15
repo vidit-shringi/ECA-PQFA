@@ -1,5 +1,17 @@
 from backend.app.services.metrics import evaluate
 
+
 def test_metrics():
-    r=evaluate([{'assurance_state':'L1','assessed':True,'refuted':False,'verified_scope':'C','scope_status':'SCOPE_MATCH','provenance_complete':True},{'assurance_state':'L2','assessed':True,'refuted':True,'verified_scope':'B','scope_status':'SCOPE_INFLATION','provenance_complete':False}],2)
-    assert r['VCR_1']==1.0 and r['FCCR']==0.5 and r['IRR']==0.5
+    r = evaluate([
+        {"assurance_state": "L1", "assessed": True, "refuted": False, "verified_scope": "C", "scope_status": "SCOPE_MATCH", "provenance_complete": True},
+        {"assurance_state": "L2", "assessed": True, "refuted": True, "verified_scope": "B", "scope_status": "SCOPE_INFLATION", "provenance_complete": False},
+    ], 2)
+    assert r["VCR_1"] == 1.0 and r["FCCR"] == 0.5 and r["IRR"] == 0.5
+
+
+def test_false_string_is_not_truthy():
+    r = evaluate([
+        {"assurance_state": "L0", "assessed": "TRUE", "refuted": "FALSE", "verified_scope": "C", "scope_status": "SCOPE_MATCH", "provenance_complete": "FALSE"}
+    ], 1)
+    assert r["FCCR"] == 0.0
+    assert r["EPC"] == 0.0
